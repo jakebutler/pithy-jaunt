@@ -105,29 +105,62 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
         };
       }
       
-      // Ensure data is not empty
-      if (!data || Object.keys(data).length === 0) {
-        console.warn("[TaskActions] Empty data object, creating default error");
+      // Ensure data is not empty - do this BEFORE checking response.ok
+      if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+        console.warn("[TaskActions] Empty or invalid data object detected");
+        console.warn("[TaskActions] Data value:", data);
+        console.warn("[TaskActions] Data type:", typeof data);
+        console.warn("[TaskActions] Response status:", response.status);
         data = { 
           error: `Server error: ${response.status} ${response.statusText}`,
-          details: "Empty response body"
+          details: responseText || "Empty or invalid response body"
         };
+        console.warn("[TaskActions] Created default error data:", data);
       }
+      
+      // Log final data state before using it
+      console.log("[TaskActions] Final data object before error check:", {
+        hasData: !!data,
+        dataType: typeof data,
+        dataKeys: data ? Object.keys(data) : [],
+        dataValue: data,
+      });
 
       if (!response.ok) {
+        // Final safety check - ensure we have error data
+        if (!data || Object.keys(data).length === 0) {
+          console.error("[TaskActions] CRITICAL: Data object is empty after all parsing attempts");
+          data = {
+            error: `Server error: ${response.status} ${response.statusText}`,
+            details: "No error details available - response body was empty or invalid"
+          };
+        }
+        
         const errorMessage = data.details 
           ? `${data.error || "Error"}: ${data.details}`
           : data.error || `Failed to execute task (${response.status} ${response.statusText})`;
-        console.error("[TaskActions] Error executing task:", {
+        
+        const errorLogData = {
           status: response.status,
           statusText: response.statusText,
           contentType,
           isJson,
-          error: data.error,
-          details: data.details,
+          error: data?.error || "NO ERROR FIELD",
+          details: data?.details || "NO DETAILS FIELD",
           fullData: data,
+          responseText: responseText || "NO RESPONSE TEXT",
+          dataKeys: data ? Object.keys(data) : [],
+          dataStringified: JSON.stringify(data, null, 2),
+        };
+        
+        console.error("[TaskActions] Error executing task:", errorLogData);
+        console.error("[TaskActions] Full error context:", {
+          response,
+          data,
           responseText,
+          contentType,
         });
+        
         setError(errorMessage);
         setIsExecuting(false);
         return;
