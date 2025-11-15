@@ -29,6 +29,8 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
     setSuccessMessage(null);
     setIsExecuting(true);
 
+    console.log("[TaskActions] Executing task:", taskId);
+
     try {
       const response = await fetch(`/api/task/${taskId}/execute`, {
         method: "POST",
@@ -36,12 +38,22 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
         body: JSON.stringify({}),
       });
 
+      console.log("[TaskActions] Response status:", response.status);
+      console.log("[TaskActions] Response headers:", Object.fromEntries(response.headers.entries()));
+
       const data = await response.json();
+      console.log("[TaskActions] Response data:", data);
 
       if (!response.ok) {
         const errorMessage = data.details 
           ? `${data.error}: ${data.details}`
           : data.error || `Failed to execute task (${response.status})`;
+        console.error("[TaskActions] Error executing task:", {
+          status: response.status,
+          error: data.error,
+          details: data.details,
+          fullData: data,
+        });
         setError(errorMessage);
         setIsExecuting(false);
         return;
