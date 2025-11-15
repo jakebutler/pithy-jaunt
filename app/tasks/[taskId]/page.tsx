@@ -3,6 +3,8 @@ import { redirect, notFound } from "next/navigation";
 import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { TaskLogs } from "@/components/tasks/TaskLogs";
+import { WorkspaceStatus } from "@/components/tasks/WorkspaceStatus";
 import Link from "next/link";
 
 export default async function TaskDetailPage({
