@@ -93,6 +93,7 @@ export const updateRepoAnalysis = mutation({
 
 /**
  * Get repository by URL and user (for duplicate checking)
+ * Matches by full GitHub URL (e.g., https://github.com/owner/repo)
  */
 export const getRepoByUrlAndUser = query({
   args: {
@@ -100,10 +101,17 @@ export const getRepoByUrlAndUser = query({
     url: v.string(),
   },
   handler: async (ctx, args) => {
+    // Normalize URL for comparison (remove trailing slash, .git suffix)
+    const normalizedUrl = args.url.replace(/\/$/, "").replace(/\.git$/, "");
+    
     return await ctx.db
       .query("repos")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .filter((q) => q.eq(q.field("url"), args.url))
+      .filter((q) => {
+        const repoUrl = q.field("url");
+        const normalizedRepoUrl = repoUrl.replace(/\/$/, "").replace(/\.git$/, "");
+        return normalizedRepoUrl === normalizedUrl;
+      })
       .first();
   },
 });

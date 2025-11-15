@@ -73,11 +73,14 @@ export async function POST(request: Request) {
     const targetBranch = branch || validation.defaultBranch;
 
     // Check for duplicate connection
+    // First get the full URL from metadata
+    const metadata = await fetchRepositoryMetadata(repoUrl);
+    
     const existingRepo = await convexClient.query(
       api.repos.getRepoByUrlAndUser,
       {
         userId: convexUser._id,
-        url: validation.owner + "/" + validation.repo,
+        url: metadata.url,
       }
     );
 
@@ -97,9 +100,6 @@ export async function POST(request: Request) {
       validation.repo,
       targetBranch
     );
-
-    // Fetch full repository metadata
-    const metadata = await fetchRepositoryMetadata(repoUrl);
 
     // Create repository record in Convex
     const repoId = await convexClient.mutation(api.repos.createRepo, {
