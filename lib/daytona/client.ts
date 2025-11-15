@@ -31,31 +31,44 @@ export async function createWorkspace(params: {
     throw new Error("DAYTONA_API_KEY environment variable is required");
   }
 
-  // TODO: Implement actual Daytona API call
-  // This is a placeholder that will be updated based on actual API
-  
-  // Expected request:
-  // POST /workspace
-  // {
-  //   "template": "pithy-jaunt-dev",
-  //   "repoUrl": params.repoUrl,
-  //   "branch": params.branch,
-  //   "env": {
-  //     "TARGET_REPO": params.repoUrl,
-  //     "BRANCH_NAME": `pj/${params.taskId}`,
-  //     "TASK_ID": params.taskId,
-  //     "AGENT_PROMPT": params.taskDescription,
-  //     "OPENAI_API_KEY": process.env.OPENAI_API_KEY,
-  //     "ANTHROPIC_API_KEY": process.env.ANTHROPIC_API_KEY,
-  //     "GITHUB_TOKEN": process.env.GITHUB_TOKEN,
-  //     "MODEL_PROVIDER": params.modelProvider,
-  //     "MODEL": params.model,
-  //   }
-  // }
+  const response = await fetch(`${DAYTONA_API_URL}/workspace`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${DAYTONA_API_KEY}`,
+    },
+    body: JSON.stringify({
+      template: "pithy-jaunt-dev",
+      repoUrl: params.repoUrl,
+      branch: params.branch,
+      env: {
+        TARGET_REPO: params.repoUrl,
+        BRANCH_NAME: `pj/${params.taskId}`,
+        TASK_ID: params.taskId,
+        AGENT_PROMPT: params.taskDescription,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
+        GITHUB_TOKEN: process.env.GITHUB_TOKEN || "",
+        MODEL_PROVIDER: params.modelProvider,
+        MODEL: params.model,
+        WEBHOOK_URL: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/webhook/daytona`,
+      },
+    }),
+  });
 
-  throw new Error(
-    "Daytona API integration pending - needs implementation based on actual API"
-  );
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Daytona API error: ${response.status} ${response.statusText} - ${errorText}`
+    );
+  }
+
+  const data = await response.json();
+  
+  return {
+    workspaceId: data.workspaceId || data.id,
+    status: data.status || "creating",
+  };
 }
 
 /**
@@ -69,12 +82,32 @@ export async function getWorkspaceStatus(workspaceId: string): Promise<{
     throw new Error("DAYTONA_API_KEY environment variable is required");
   }
 
-  // TODO: Implement actual Daytona API call
-  // GET /workspace/{workspaceId}
+  const response = await fetch(`${DAYTONA_API_URL}/workspace/${workspaceId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${DAYTONA_API_KEY}`,
+    },
+  });
 
-  throw new Error(
-    "Daytona API integration pending - needs implementation based on actual API"
-  );
+  if (!response.ok) {
+    if (response.status === 404) {
+      return {
+        workspaceId,
+        status: "terminated",
+      };
+    }
+    const errorText = await response.text();
+    throw new Error(
+      `Daytona API error: ${response.status} ${response.statusText} - ${errorText}`
+    );
+  }
+
+  const data = await response.json();
+  
+  return {
+    workspaceId: data.workspaceId || data.id || workspaceId,
+    status: data.status || "running",
+  };
 }
 
 /**
@@ -85,12 +118,20 @@ export async function terminateWorkspace(workspaceId: string): Promise<void> {
     throw new Error("DAYTONA_API_KEY environment variable is required");
   }
 
-  // TODO: Implement actual Daytona API call
-  // DELETE /workspace/{workspaceId}
+  const response = await fetch(`${DAYTONA_API_URL}/workspace/${workspaceId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${DAYTONA_API_KEY}`,
+    },
+  });
 
-  throw new Error(
-    "Daytona API integration pending - needs implementation based on actual API"
-  );
+  if (!response.ok && response.status !== 404) {
+    // 404 is acceptable (workspace already terminated)
+    const errorText = await response.text();
+    throw new Error(
+      `Daytona API error: ${response.status} ${response.statusText} - ${errorText}`
+    );
+  }
 }
 
 /**
