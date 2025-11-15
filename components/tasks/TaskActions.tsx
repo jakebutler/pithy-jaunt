@@ -38,127 +38,53 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
         body: JSON.stringify({}),
       });
 
+      // Always read the response as text first, then try to parse as JSON
+      const responseText = await response.text();
+      console.log("[TaskActions] Raw response text:", responseText);
       console.log("[TaskActions] Response status:", response.status);
       console.log("[TaskActions] Response statusText:", response.statusText);
       console.log("[TaskActions] Response ok:", response.ok);
       
-      const headers: Record<string, string> = {};
-      response.headers.forEach((value, key) => {
-        headers[key] = value;
-      });
-      console.log("[TaskActions] Response headers:", headers);
-
-      // Check if response has content
-      const contentType = response.headers.get("content-type");
-      const isJson = contentType?.includes("application/json");
-      console.log("[TaskActions] Content-Type:", contentType, "isJson:", isJson);
+      let data: any = { error: "Unknown error" };
       
-      let data: any = {};
-      let responseText = "";
-
-      try {
-        // Clone the response to read it without consuming it
-        const clonedResponse = response.clone();
-        
-        if (isJson) {
-          try {
-            data = await response.json();
-            console.log("[TaskActions] Response data (JSON):", JSON.stringify(data, null, 2));
-          } catch (jsonError) {
-            console.error("[TaskActions] JSON parse error:", jsonError);
-            responseText = await clonedResponse.text();
-            console.log("[TaskActions] Response text (fallback):", responseText);
-            data = { 
-              error: `Invalid JSON response: ${response.status} ${response.statusText}`,
-              details: responseText || "Empty response body"
-            };
-          }
-        } else {
-          responseText = await response.text();
-          console.log("[TaskActions] Response data (text):", responseText);
-          // Try to parse as JSON anyway
-          if (responseText.trim()) {
-            try {
-              data = JSON.parse(responseText);
-              console.log("[TaskActions] Parsed as JSON:", data);
-            } catch {
-              // Not JSON, use text as error message
-              data = { 
-                error: responseText || `Server error: ${response.status} ${response.statusText}` 
-              };
-            }
-          } else {
-            data = { 
-              error: `Empty response: ${response.status} ${response.statusText}` 
-            };
-          }
-        }
-      } catch (parseError: any) {
-        console.error("[TaskActions] Error parsing response:", parseError);
-        console.error("[TaskActions] Parse error details:", {
-          message: parseError.message,
-          stack: parseError.stack,
-        });
-        data = { 
-          error: `Failed to parse response: ${response.status} ${response.statusText}`,
-          details: responseText || parseError.message || "Unknown error"
-        };
-      }
-      
-      // Ensure data is not empty - do this BEFORE checking response.ok
-      if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
-        console.warn("[TaskActions] Empty or invalid data object detected");
-        console.warn("[TaskActions] Data value:", data);
-        console.warn("[TaskActions] Data type:", typeof data);
-        console.warn("[TaskActions] Response status:", response.status);
-        data = { 
-          error: `Server error: ${response.status} ${response.statusText}`,
-          details: responseText || "Empty or invalid response body"
-        };
-        console.warn("[TaskActions] Created default error data:", data);
-      }
-      
-      // Log final data state before using it
-      console.log("[TaskActions] Final data object before error check:", {
-        hasData: !!data,
-        dataType: typeof data,
-        dataKeys: data ? Object.keys(data) : [],
-        dataValue: data,
-      });
-
-      if (!response.ok) {
-        // Final safety check - ensure we have error data
-        if (!data || Object.keys(data).length === 0) {
-          console.error("[TaskActions] CRITICAL: Data object is empty after all parsing attempts");
+      // Try to parse as JSON
+      if (responseText.trim()) {
+        try {
+          data = JSON.parse(responseText);
+          console.log("[TaskActions] Parsed JSON data:", data);
+        } catch (parseError) {
+          console.error("[TaskActions] Failed to parse JSON:", parseError);
+          // If it's not JSON, use the text as the error message
           data = {
             error: `Server error: ${response.status} ${response.statusText}`,
-            details: "No error details available - response body was empty or invalid"
+            details: responseText
           };
         }
-        
+      } else {
+        // Empty response
+        data = {
+          error: `Server error: ${response.status} ${response.statusText}`,
+          details: "Empty response body"
+        };
+      }
+
+      // Ensure we always have an error field
+      if (!data.error) {
+        data.error = data.message || `Error ${response.status}`;
+      }
+
+      if (!response.ok) {
         const errorMessage = data.details 
-          ? `${data.error || "Error"}: ${data.details}`
-          : data.error || `Failed to execute task (${response.status} ${response.statusText})`;
+          ? `${data.error}: ${data.details}`
+          : data.error || `Failed to execute task (${response.status})`;
         
-        const errorLogData = {
+        console.error("[TaskActions] Error executing task:", {
           status: response.status,
           statusText: response.statusText,
-          contentType,
-          isJson,
-          error: data?.error || "NO ERROR FIELD",
-          details: data?.details || "NO DETAILS FIELD",
+          error: data.error,
+          details: data.details,
           fullData: data,
-          responseText: responseText || "NO RESPONSE TEXT",
-          dataKeys: data ? Object.keys(data) : [],
-          dataStringified: JSON.stringify(data, null, 2),
-        };
-        
-        console.error("[TaskActions] Error executing task:", errorLogData);
-        console.error("[TaskActions] Full error context:", {
-          response,
-          data,
           responseText,
-          contentType,
         });
         
         setError(errorMessage);
