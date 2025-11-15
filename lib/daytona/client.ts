@@ -31,11 +31,21 @@ export async function createWorkspace(params: {
     throw new Error("DAYTONA_API_KEY environment variable is required");
   }
 
+  console.log("[Daytona] Creating workspace:", {
+    url: `${DAYTONA_API_URL}/workspace`,
+    hasApiKey: !!DAYTONA_API_KEY,
+    apiKeyLength: DAYTONA_API_KEY?.length || 0,
+    template: "pithy-jaunt-dev",
+    repoUrl: params.repoUrl,
+    branch: params.branch,
+  });
+
   const response = await fetch(`${DAYTONA_API_URL}/workspace`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${DAYTONA_API_KEY}`,
+      "User-Agent": "PithyJaunt/1.0",
     },
     body: JSON.stringify({
       template: "pithy-jaunt-dev",
@@ -58,8 +68,42 @@ export async function createWorkspace(params: {
 
   if (!response.ok) {
     const errorText = await response.text();
+    const contentType = response.headers.get("content-type");
+    
+    // Parse HTML error responses (like CloudFront errors)
+    let errorMessage = errorText;
+    if (contentType?.includes("text/html")) {
+      // Extract meaningful error from HTML
+      const titleMatch = errorText.match(/<TITLE>(.*?)<\/TITLE>/i);
+      const h2Match = errorText.match(/<H2>(.*?)<\/H2>/i);
+      
+      if (titleMatch) {
+        errorMessage = titleMatch[1];
+      }
+      if (h2Match) {
+        errorMessage += `: ${h2Match[1]}`;
+      }
+      
+      // Check for CloudFront specific errors
+      if (errorText.includes("CloudFront")) {
+        errorMessage = "Daytona API is blocked by CloudFront. This usually means:\n" +
+          "1. The API URL is incorrect or points to a CloudFront distribution\n" +
+          "2. The API key is missing or invalid\n" +
+          "3. CloudFront is blocking the request (IP, headers, etc.)\n" +
+          `\nStatus: ${response.status} ${response.statusText}`;
+      }
+    }
+    
+    console.error("[Daytona] API error:", {
+      status: response.status,
+      statusText: response.statusText,
+      contentType,
+      errorMessage,
+      url: `${DAYTONA_API_URL}/workspace`,
+    });
+    
     throw new Error(
-      `Daytona API error: ${response.status} ${response.statusText} - ${errorText}`
+      `Daytona API error: ${response.status} ${response.statusText} - ${errorMessage}`
     );
   }
 
