@@ -108,3 +108,28 @@ export const updateTaskStatus = mutation({
   },
 });
 
+/**
+ * Update task workspace and branch info
+ */
+export const updateTaskWorkspace = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    assignedWorkspaceId: v.optional(v.string()),
+    branchName: v.optional(v.string()),
+    prUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    if (!task) {
+      throw new Error("Task not found");
+    }
+
+    await ctx.db.patch(args.taskId, {
+      assignedWorkspaceId: args.assignedWorkspaceId ?? task.assignedWorkspaceId,
+      branchName: args.branchName ?? task.branchName,
+      prUrl: args.prUrl ?? task.prUrl,
+      updatedAt: Date.now(),
+    });
+  },
+});
+

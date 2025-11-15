@@ -11,6 +11,7 @@
 import type * as repos from "../repos.js";
 import type * as tasks from "../tasks.js";
 import type * as users from "../users.js";
+import type * as workspaces from "../workspaces.js";
 
 import type {
   ApiFromModules,
@@ -22,6 +23,7 @@ declare const fullApi: ApiFromModules<{
   repos: typeof repos;
   tasks: typeof tasks;
   users: typeof users;
+  workspaces: typeof workspaces;
 }>;
 
 /**

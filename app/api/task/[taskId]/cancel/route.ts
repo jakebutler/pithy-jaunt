@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { terminateWorkspace, isDaytonaConfigured } from "@/lib/daytona/client";
 
 /**
  * POST /api/task/[taskId]/cancel
@@ -72,12 +73,30 @@ export async function POST(
     }
 
     // Parse request body
-    const { terminateWorkspace } = await request.json();
+    const { terminateWorkspace: shouldTerminate } = await request.json();
 
-    // TODO: Terminate Daytona workspace if requested
-    // if (terminateWorkspace && task.assignedWorkspaceId) {
-    //   await terminateDaytonaWorkspace(task.assignedWorkspaceId);
-    // }
+    // Terminate Daytona workspace if requested and configured
+    if (shouldTerminate && task.assignedWorkspaceId && isDaytonaConfigured()) {
+      try {
+        await terminateWorkspace(task.assignedWorkspaceId);
+
+        // Update workspace status in Convex
+        const workspace = await convexClient.query(
+          api.workspaces.getWorkspaceByDaytonaId,
+          { daytonaId: task.assignedWorkspaceId }
+        );
+
+        if (workspace) {
+          await convexClient.mutation(api.workspaces.updateWorkspaceStatus, {
+            workspaceId: workspace._id,
+            status: "terminated",
+          });
+        }
+      } catch (error: any) {
+        console.error("Failed to terminate workspace:", error);
+        // Continue with task cancellation even if workspace termination fails
+      }
+    }
 
     // Update task status to cancelled
     await convexClient.mutation(api.tasks.updateTaskStatus, {
