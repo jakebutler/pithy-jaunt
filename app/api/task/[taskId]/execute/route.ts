@@ -28,20 +28,21 @@ export async function POST(
     // Get authenticated user
     const supabase = await createClient();
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-    if (!session) {
-      console.log("[TASK EXECUTE] No session found");
+    if (authError || !user) {
+      console.log("[TASK EXECUTE] No user found:", authError?.message);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log("[TASK EXECUTE] User authenticated:", session.user.id);
+    console.log("[TASK EXECUTE] User authenticated:", user.id);
 
     // Get user from Convex
     const convexUser = await convexClient.query(
       api.users.getUserBySupabaseId,
-      { supabaseUserId: session.user.id }
+      { supabaseUserId: user.id }
     );
 
     if (!convexUser) {
@@ -101,10 +102,14 @@ export async function POST(
     // Parse request body (optional)
     let keepWorkspaceAlive = false;
     try {
-      const body = await request.json();
-      keepWorkspaceAlive = body.keepWorkspaceAlive || false;
-    } catch {
-      // Empty body is fine, use defaults
+      const contentType = request.headers.get("content-type");
+      if (contentType?.includes("application/json")) {
+        const body = await request.json();
+        keepWorkspaceAlive = body.keepWorkspaceAlive || false;
+      }
+    } catch (error) {
+      // Empty body or invalid JSON is fine, use defaults
+      console.log("[TASK EXECUTE] Could not parse request body:", error);
     }
 
     // Get repository info
