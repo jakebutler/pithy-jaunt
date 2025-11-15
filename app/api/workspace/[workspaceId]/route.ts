@@ -11,9 +11,11 @@ import { getWorkspaceStatus } from "@/lib/daytona/client";
  */
 export async function GET(
   request: Request,
-  { params }: { params: { workspaceId: string } }
+  { params }: { params: Promise<{ workspaceId: string }> }
 ) {
   try {
+    const { workspaceId } = await params;
+    
     // Get authenticated user
     const supabase = await createClient();
     const {
@@ -39,7 +41,7 @@ export async function GET(
 
     // Get workspace
     const workspace = await convexClient.query(api.workspaces.getWorkspaceById, {
-      workspaceId: params.workspaceId as Id<"workspaces">,
+      workspaceId: workspaceId as Id<"workspaces">,
     });
 
     if (!workspace) {

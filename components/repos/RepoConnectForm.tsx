@@ -136,7 +136,7 @@ export function RepoConnectForm({ onSuccess }: RepoConnectFormProps) {
           aria-describedby="branch-help"
         />
         <p id="branch-help" className="mt-1 text-sm text-gray-500">
-          Leave empty to use the repository's default branch
+          Leave empty to use the repository&apos;s default branch
         </p>
       </div>
 

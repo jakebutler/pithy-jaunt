@@ -16,9 +16,11 @@ import { createWorkspace, isDaytonaConfigured } from "@/lib/daytona/client";
  */
 export async function POST(
   request: Request,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    const { taskId } = await params;
+    
     // Get authenticated user
     const supabase = await createClient();
     const {
@@ -44,7 +46,7 @@ export async function POST(
 
     // Get task
     const task = await convexClient.query(api.tasks.getTaskById, {
-      taskId: params.taskId as Id<"tasks">,
+      taskId: taskId as Id<"tasks">,
     });
 
     if (!task) {

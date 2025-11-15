@@ -47,12 +47,12 @@ export function parseCodeRabbitComment(comment: string): CodeRabbitReport {
   const issues: CodeRabbitReport["issues"] = [];
   
   // Extract summary (usually at the beginning)
-  const summaryMatch = comment.match(/## Summary\s*\n\n(.*?)(?=\n##|\n###|$)/s);
+  const summaryMatch = comment.match(/## Summary\s*\n\n([\s\S]*?)(?=\n##|\n###|$)/);
   const summary = summaryMatch ? summaryMatch[1].trim() : "Analysis completed";
   
   // Extract tasks/suggestions
   // CodeRabbit typically uses markdown lists with priority indicators
-  const taskMatches = comment.matchAll(/[-*]\s*\*\*(.*?)\*\*:?\s*(.*?)(?=\n[-*]|\n##|$)/gs);
+  const taskMatches = comment.matchAll(/[-*]\s*\*\*(.*?)\*\*:?\s*([\s\S]*?)(?=\n[-*]|\n##|$)/g);
   
   for (const match of taskMatches) {
     const title = match[1].trim();

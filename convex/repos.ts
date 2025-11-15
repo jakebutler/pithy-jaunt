@@ -104,15 +104,17 @@ export const getRepoByUrlAndUser = query({
     // Normalize URL for comparison (remove trailing slash, .git suffix)
     const normalizedUrl = args.url.replace(/\/$/, "").replace(/\.git$/, "");
     
-    return await ctx.db
+    // Fetch all repos for the user and filter in JavaScript
+    // (Convex expressions don't support string methods like replace)
+    const repos = await ctx.db
       .query("repos")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .filter((q) => {
-        const repoUrl = q.field("url");
-        const normalizedRepoUrl = repoUrl.replace(/\/$/, "").replace(/\.git$/, "");
-        return normalizedRepoUrl === normalizedUrl;
-      })
-      .first();
+      .collect();
+    
+    return repos.find((repo) => {
+      const normalizedRepoUrl = repo.url.replace(/\/$/, "").replace(/\.git$/, "");
+      return normalizedRepoUrl === normalizedUrl;
+    });
   },
 });
 

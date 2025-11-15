@@ -10,9 +10,11 @@ import { Id } from "@/convex/_generated/dataModel";
  */
 export async function GET(
   request: Request,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    const { taskId } = await params;
+    
     // Get authenticated user
     const supabase = await createClient();
     const {
@@ -38,7 +40,7 @@ export async function GET(
 
     // Get task
     const task = await convexClient.query(api.tasks.getTaskById, {
-      taskId: params.taskId as Id<"tasks">,
+      taskId: taskId as Id<"tasks">,
     });
 
     if (!task) {

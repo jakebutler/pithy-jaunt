@@ -9,8 +9,10 @@ import Link from "next/link";
 export default async function CreateTaskPage({
   params,
 }: {
-  params: { repoId: string };
+  params: Promise<{ repoId: string }>;
 }) {
+  const { repoId } = await params;
+  
   const supabase = await createClient();
   
   const {
@@ -33,7 +35,7 @@ export default async function CreateTaskPage({
 
   // Fetch repository
   const repo = await convexClient.query(api.repos.getRepoById, {
-    repoId: params.repoId as Id<"repos">,
+    repoId: repoId as Id<"repos">,
   });
 
   if (!repo) {

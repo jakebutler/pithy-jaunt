@@ -10,8 +10,10 @@ import Link from "next/link";
 export default async function TaskDetailPage({
   params,
 }: {
-  params: { taskId: string };
+  params: Promise<{ taskId: string }>;
 }) {
+  const { taskId } = await params;
+  
   const supabase = await createClient();
   
   const {
@@ -34,7 +36,7 @@ export default async function TaskDetailPage({
 
   // Fetch task
   const task = await convexClient.query(api.tasks.getTaskById, {
-    taskId: params.taskId as Id<"tasks">,
+    taskId: taskId as Id<"tasks">,
   });
 
   if (!task) {
@@ -51,10 +53,10 @@ export default async function TaskDetailPage({
     repoId: task.repoId,
   });
 
-  function getStatusBadge() {
+  function getStatusBadge(taskStatus: "queued" | "running" | "completed" | "failed" | "needs_review" | "cancelled") {
     const baseClasses = "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium";
     
-    switch (task.status) {
+    switch (taskStatus) {
       case "completed":
         return <span className={`${baseClasses} bg-green-100 text-green-800`}>Completed</span>;
       case "running":
@@ -120,7 +122,7 @@ export default async function TaskDetailPage({
                   {task.title}
                 </h1>
                 <div className="flex items-center gap-3 mb-4">
-                  {getStatusBadge()}
+                  {getStatusBadge(task.status)}
                   <span className="text-sm text-gray-600">
                     Priority: {task.priority}
                   </span>

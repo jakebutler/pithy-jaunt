@@ -10,9 +10,11 @@ import { Id } from "@/convex/_generated/dataModel";
  */
 export async function GET(
   request: Request,
-  { params }: { params: { repoId: string } }
+  { params }: { params: Promise<{ repoId: string }> }
 ) {
   try {
+    const { repoId } = await params;
+    
     // Get authenticated user
     const supabase = await createClient();
     const {
@@ -38,7 +40,7 @@ export async function GET(
 
     // Get repository
     const repo = await convexClient.query(api.repos.getRepoById, {
-      repoId: params.repoId as Id<"repos">,
+      repoId: repoId as Id<"repos">,
     });
 
     if (!repo) {

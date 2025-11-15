@@ -48,7 +48,7 @@ export default function MagicLinkPage() {
             Sign in with magic link
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            No password needed. We'll send you a link to sign in.
+            No password needed. We&apos;ll send you a link to sign in.
           </p>
           <p className="mt-1 text-center text-sm text-gray-600">
             Or{" "}
@@ -81,7 +81,7 @@ export default function MagicLinkPage() {
               <p className="font-medium">{message}</p>
               <p className="text-sm mt-1">
                 The link will expire in 15 minutes. Check your spam folder if
-                you don't see it.
+                you don&apos;t see it.
               </p>
             </div>
           )}

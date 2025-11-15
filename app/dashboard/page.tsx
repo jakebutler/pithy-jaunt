@@ -97,7 +97,7 @@ export default async function DashboardPage() {
               Dashboard
             </h1>
             <p className="text-gray-600">
-              Welcome back! Here's an overview of your repositories and tasks.
+              Welcome back! Here&apos;s an overview of your repositories and tasks.
             </p>
           </div>
 
