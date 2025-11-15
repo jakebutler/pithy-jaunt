@@ -40,35 +40,77 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
 
       console.log("[TaskActions] Response status:", response.status);
       console.log("[TaskActions] Response statusText:", response.statusText);
-      console.log("[TaskActions] Response headers:", Object.fromEntries(response.headers.entries()));
+      console.log("[TaskActions] Response ok:", response.ok);
+      
+      const headers: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      console.log("[TaskActions] Response headers:", headers);
 
       // Check if response has content
       const contentType = response.headers.get("content-type");
       const isJson = contentType?.includes("application/json");
+      console.log("[TaskActions] Content-Type:", contentType, "isJson:", isJson);
       
       let data: any = {};
       let responseText = "";
 
       try {
+        // Clone the response to read it without consuming it
+        const clonedResponse = response.clone();
+        
         if (isJson) {
-          data = await response.json();
-          console.log("[TaskActions] Response data (JSON):", data);
+          try {
+            data = await response.json();
+            console.log("[TaskActions] Response data (JSON):", JSON.stringify(data, null, 2));
+          } catch (jsonError) {
+            console.error("[TaskActions] JSON parse error:", jsonError);
+            responseText = await clonedResponse.text();
+            console.log("[TaskActions] Response text (fallback):", responseText);
+            data = { 
+              error: `Invalid JSON response: ${response.status} ${response.statusText}`,
+              details: responseText || "Empty response body"
+            };
+          }
         } else {
           responseText = await response.text();
           console.log("[TaskActions] Response data (text):", responseText);
           // Try to parse as JSON anyway
-          try {
-            data = JSON.parse(responseText);
-          } catch {
-            // Not JSON, use text as error message
-            data = { error: responseText || `Server error: ${response.status} ${response.statusText}` };
+          if (responseText.trim()) {
+            try {
+              data = JSON.parse(responseText);
+              console.log("[TaskActions] Parsed as JSON:", data);
+            } catch {
+              // Not JSON, use text as error message
+              data = { 
+                error: responseText || `Server error: ${response.status} ${response.statusText}` 
+              };
+            }
+          } else {
+            data = { 
+              error: `Empty response: ${response.status} ${response.statusText}` 
+            };
           }
         }
-      } catch (parseError) {
+      } catch (parseError: any) {
         console.error("[TaskActions] Error parsing response:", parseError);
+        console.error("[TaskActions] Parse error details:", {
+          message: parseError.message,
+          stack: parseError.stack,
+        });
         data = { 
           error: `Failed to parse response: ${response.status} ${response.statusText}`,
-          details: responseText || "Empty response body"
+          details: responseText || parseError.message || "Unknown error"
+        };
+      }
+      
+      // Ensure data is not empty
+      if (!data || Object.keys(data).length === 0) {
+        console.warn("[TaskActions] Empty data object, creating default error");
+        data = { 
+          error: `Server error: ${response.status} ${response.statusText}`,
+          details: "Empty response body"
         };
       }
 
