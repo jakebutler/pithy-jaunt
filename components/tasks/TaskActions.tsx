@@ -39,20 +39,52 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
       });
 
       console.log("[TaskActions] Response status:", response.status);
+      console.log("[TaskActions] Response statusText:", response.statusText);
       console.log("[TaskActions] Response headers:", Object.fromEntries(response.headers.entries()));
 
-      const data = await response.json();
-      console.log("[TaskActions] Response data:", data);
+      // Check if response has content
+      const contentType = response.headers.get("content-type");
+      const isJson = contentType?.includes("application/json");
+      
+      let data: any = {};
+      let responseText = "";
+
+      try {
+        if (isJson) {
+          data = await response.json();
+          console.log("[TaskActions] Response data (JSON):", data);
+        } else {
+          responseText = await response.text();
+          console.log("[TaskActions] Response data (text):", responseText);
+          // Try to parse as JSON anyway
+          try {
+            data = JSON.parse(responseText);
+          } catch {
+            // Not JSON, use text as error message
+            data = { error: responseText || `Server error: ${response.status} ${response.statusText}` };
+          }
+        }
+      } catch (parseError) {
+        console.error("[TaskActions] Error parsing response:", parseError);
+        data = { 
+          error: `Failed to parse response: ${response.status} ${response.statusText}`,
+          details: responseText || "Empty response body"
+        };
+      }
 
       if (!response.ok) {
         const errorMessage = data.details 
-          ? `${data.error}: ${data.details}`
-          : data.error || `Failed to execute task (${response.status})`;
+          ? `${data.error || "Error"}: ${data.details}`
+          : data.error || `Failed to execute task (${response.status} ${response.statusText})`;
         console.error("[TaskActions] Error executing task:", {
           status: response.status,
+          statusText: response.statusText,
+          contentType,
+          isJson,
           error: data.error,
           details: data.details,
           fullData: data,
+          responseText,
         });
         setError(errorMessage);
         setIsExecuting(false);
