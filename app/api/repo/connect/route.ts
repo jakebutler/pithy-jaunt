@@ -51,8 +51,23 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate repository
-    const validation = await validateRepository(repoUrl);
+    // Validate repository with retry logic for rate limits
+    let validation;
+    try {
+      validation = await validateRepository(repoUrl);
+    } catch (error: any) {
+      // Handle rate limit errors
+      if (error.status === 403) {
+        return NextResponse.json(
+          {
+            error:
+              "GitHub API rate limit exceeded. Please try again in a few minutes.",
+          },
+          { status: 429 }
+        );
+      }
+      throw error;
+    }
     
     // Use provided branch or default branch
     const targetBranch = branch || validation.defaultBranch;

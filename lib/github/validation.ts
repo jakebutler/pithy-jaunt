@@ -53,6 +53,28 @@ export async function validateRepository(repoUrl: string): Promise<{
 }
 
 /**
+ * Handle GitHub API rate limit errors
+ */
+export function handleRateLimit(error: any): {
+  retryAfter?: number;
+  shouldRetry: boolean;
+} {
+  if (error.status === 403 && error.headers?.["x-ratelimit-remaining"] === "0") {
+    const resetTime = parseInt(error.headers["x-ratelimit-reset"] || "0");
+    const retryAfter = Math.max(0, resetTime - Math.floor(Date.now() / 1000));
+    
+    return {
+      retryAfter,
+      shouldRetry: true,
+    };
+  }
+  
+  return {
+    shouldRetry: false,
+  };
+}
+
+/**
  * Check if a repository has a CodeRabbit configuration file
  * @param owner Repository owner
  * @param repo Repository name
