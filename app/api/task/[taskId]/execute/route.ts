@@ -74,8 +74,14 @@ export async function POST(
       );
     }
 
-    // Parse request body
-    const { keepWorkspaceAlive } = await request.json();
+    // Parse request body (optional)
+    let keepWorkspaceAlive = false;
+    try {
+      const body = await request.json();
+      keepWorkspaceAlive = body.keepWorkspaceAlive || false;
+    } catch {
+      // Empty body is fine, use defaults
+    }
 
     // Get repository info
     const repo = await convexClient.query(api.repos.getRepoById, {
@@ -86,6 +92,29 @@ export async function POST(
       return NextResponse.json(
         { error: "Repository not found" },
         { status: 404 }
+      );
+    }
+
+    // Validate repository has required fields
+    if (!repo.url) {
+      return NextResponse.json(
+        { error: "Repository URL is missing" },
+        { status: 400 }
+      );
+    }
+
+    if (!repo.branch) {
+      return NextResponse.json(
+        { error: "Repository branch is missing" },
+        { status: 400 }
+      );
+    }
+
+    // Validate task has model preference
+    if (!task.modelPreference || !task.modelPreference.provider || !task.modelPreference.model) {
+      return NextResponse.json(
+        { error: "Task model preference is missing or invalid" },
+        { status: 400 }
       );
     }
 
@@ -150,6 +179,13 @@ export async function POST(
       );
     } catch (error: any) {
       console.error("Workspace creation error:", error);
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        taskId: task._id,
+        repoUrl: repo.url,
+        branch: repo.branch,
+      });
 
       // Update task status to failed
       await convexClient.mutation(api.tasks.updateTaskStatus, {
@@ -160,15 +196,22 @@ export async function POST(
       return NextResponse.json(
         {
           error: "Failed to create workspace",
-          details: error.message,
+          details: error.message || "Unknown error",
         },
         { status: 500 }
       );
     }
   } catch (error: any) {
     console.error("Task execution error:", error);
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack,
+    });
     return NextResponse.json(
-      { error: "Failed to execute task" },
+      { 
+        error: "Failed to execute task",
+        details: error.message || "Unknown error",
+      },
       { status: 500 }
     );
   }
