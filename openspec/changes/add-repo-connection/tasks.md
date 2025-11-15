@@ -8,12 +8,13 @@
 - [ ] 1.5 Create repository metadata fetcher (owner, name, default branch)
 
 ## 2. CodeRabbit Integration
-- [ ] 2.1 Research CodeRabbit API documentation
+- [ ] 2.1 Review CodeRabbit API documentation (https://docs.coderabbit.ai)
 - [ ] 2.2 Create CodeRabbit API client (`lib/coderabbit/client.ts`)
 - [ ] 2.3 Implement repository analysis request
 - [ ] 2.4 Create CodeRabbit config detection logic
 - [ ] 2.5 Implement `.coderabbit.yaml` bootstrap creation (if missing)
 - [ ] 2.6 Add webhook handler for CodeRabbit callbacks (`/api/webhook/coderabbit`)
+  - [ ] 2.6.1 Note: MVP relies only on webhooks (no polling) - add code comment
 
 ## 3. Convex Repository Schema & Functions
 - [ ] 3.1 Verify `repos` table schema matches requirements
@@ -106,8 +107,9 @@
 - [ ] 10.2 Test private repo rejection
 - [ ] 10.3 Test duplicate repo connection prevention
 - [ ] 10.4 Test CodeRabbit analysis flow end-to-end
-- [ ] 10.5 Test webhook callback handling
+- [ ] 10.5 Test webhook callback handling (MVP: webhook-only, no polling)
 - [ ] 10.6 Verify WCAG AA compliance on all forms
 - [ ] 10.7 Test loading states and error states
 - [ ] 10.8 Test responsive design (mobile/tablet/desktop)
+- [ ] 10.9 Note: Re-analyze button deferred to post-MVP
 

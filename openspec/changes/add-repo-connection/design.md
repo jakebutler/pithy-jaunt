@@ -184,16 +184,16 @@ Pithy Jaunt requires users to connect GitHub repositories to enable code analysi
 ## Open Questions
 
 1. **CodeRabbit API Details**: What's the exact API format for triggering analysis?
-   - **Decision**: Research during implementation, create abstraction layer
+   - **Decision**: Review CodeRabbit docs (https://docs.coderabbit.ai), create abstraction layer during implementation
 
 2. **Webhook Endpoint Security**: Does CodeRabbit provide webhook signatures?
-   - **Decision**: Implement signature verification if available, otherwise use secret tokens
+   - **Decision**: Implement signature verification if available, otherwise use secret tokens. Public URL for webhook endpoint is acceptable for MVP.
 
 3. **Analysis Caching**: How long should we cache analysis results?
    - **Decision**: Store in Convex, allow manual refresh, consider TTL (post-MVP)
 
 4. **Repository Refresh**: Should users be able to re-analyze repos?
-   - **Decision**: Yes, add "Re-analyze" button that triggers new CodeRabbit analysis
+   - **Decision**: Deferred to post-MVP. MVP will rely only on webhooks for analysis status updates (no polling).
 
 ## File Structure
 
