@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth/context";
+import { ConvexClientProvider } from "@/lib/convex/client";
 
 export const metadata: Metadata = {
   title: "Pithy Jaunt - AI-Powered DevOps Autopilot",
@@ -15,9 +16,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <ConvexClientProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </ConvexClientProvider>
       </body>
     </html>
   );

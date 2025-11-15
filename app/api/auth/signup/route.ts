@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/auth/supabase-server";
 import { NextResponse } from "next/server";
+import { convexClient } from "@/lib/convex/server";
 
 /**
  * POST /api/auth/signup
  * Create a new user account with email and password
+ * Also syncs user to Convex database
  */
 export async function POST(request: Request) {
   try {
@@ -39,6 +41,22 @@ export async function POST(request: Request) {
         { error: error.message },
         { status: error.status || 400 }
       );
+    }
+
+    // Sync user to Convex (if user was created)
+    if (data.user) {
+      try {
+        // Import API dynamically to avoid build-time errors if _generated doesn't exist yet
+        const { api } = await import("@/convex/_generated/api");
+        await convexClient.mutation(api.users.upsertUser, {
+          supabaseUserId: data.user.id,
+          email: data.user.email || email,
+        });
+      } catch (convexError) {
+        // Log but don't fail signup if Convex sync fails
+        // User can still use the app, sync can be retried later
+        console.error("Failed to sync user to Convex:", convexError);
+      }
     }
 
     // Return user data
