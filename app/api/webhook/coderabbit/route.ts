@@ -2,74 +2,114 @@ import { NextResponse } from "next/server";
 import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { parseCodeRabbitComment, createTasksFromReport } from "@/lib/coderabbit/parser";
 
 /**
  * POST /api/webhook/coderabbit
  * Receive CodeRabbit analysis results via webhook
  * 
  * MVP: Webhook-only approach (no polling)
- * This endpoint receives analysis completion callbacks from CodeRabbit
  * 
- * TODO: Implement webhook signature verification if CodeRabbit provides it
+ * This endpoint receives:
+ * 1. GitHub webhooks for PR comments (when CodeRabbit reviews)
+ * 2. CodeRabbit-specific webhooks (if available)
+ * 
+ * CodeRabbit integration approach:
+ * - CodeRabbit is added to repo in Daytona workspace (if missing)
+ * - CodeRabbit automatically analyzes and creates PR comments
+ * - We parse those comments to extract tasks
+ * - Create one or more Pithy Jaunt tasks based on the analysis
  */
 export async function POST(request: Request) {
   try {
-    // TODO: Verify webhook signature if CodeRabbit provides it
-    // const signature = request.headers.get("x-coderabbit-signature");
+    // TODO: Verify webhook signature if CodeRabbit/GitHub provides it
+    // const signature = request.headers.get("x-hub-signature-256");
     // if (!verifySignature(signature, body)) {
     //   return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     // }
 
     const body = await request.json();
-
-    // TODO: Parse CodeRabbit webhook payload structure
-    // Expected structure (to be confirmed):
-    // {
-    //   repoId: string,
-    //   analysisId: string,
-    //   status: "completed" | "failed",
-    //   report: { summary: string, tasks: [...] },
-    //   ...
-    // }
-
-    const { repoId, status, report, tasks } = body;
-
-    if (!repoId) {
-      return NextResponse.json(
-        { error: "Missing repoId in webhook payload" },
-        { status: 400 }
-      );
+    
+    // Handle GitHub webhook for PR comments (CodeRabbit reviews)
+    if (body.action === "created" && body.comment) {
+      // Check if comment is from CodeRabbit
+      const isCodeRabbitComment = 
+        body.comment.user?.login?.toLowerCase().includes("coderabbit") ||
+        body.comment.body?.includes("CodeRabbit") ||
+        body.comment.body?.includes("## Summary");
+      
+      if (isCodeRabbitComment && body.pull_request) {
+        // Extract repository info from PR
+        const repoFullName = body.repository.full_name; // owner/repo
+        const commentBody = body.comment.body;
+        
+        // Find repository in our database
+        // TODO: Store repo full name or match by URL
+        // For now, we'll need to match by owner/repo name
+        
+        // Parse CodeRabbit comment into structured report
+        const report = parseCodeRabbitComment(commentBody);
+        
+        // TODO: Get repoId from repository full name
+        // This requires querying Convex by owner/name
+        // For MVP, we'll need to store the mapping or query differently
+        
+        // Create tasks from report
+        // Note: We need to find the repo by owner/name first
+        // This will be implemented when we add repository lookup by full name
+        // For now, this is a placeholder for the GitHub webhook flow
+      }
     }
-
-    // Update repository analysis status
-    await convexClient.mutation(api.repos.updateRepoAnalysis, {
-      repoId: repoId as Id<"repos">,
-      analyzerStatus: status === "completed" ? "completed" : "failed",
-      lastAnalyzedAt: Date.now(),
-    });
-
-    // TODO: Store analysis report and suggested tasks in Convex
-    // This will require additional schema/table for analysis results
-    // For now, we just update the status
-
-    // TODO: Create task suggestions from analysis
-    // if (tasks && Array.isArray(tasks)) {
-    //   for (const task of tasks) {
-    //     await convexClient.mutation(api.tasks.createTask, {
-    //       userId: repo.userId,
-    //       repoId: repoId,
-    //       title: task.title,
-    //       description: task.description,
-    //       initiator: "coderabbit",
-    //       ...
-    //     });
-    //   }
-    // }
+    
+    // Handle direct CodeRabbit webhook (if they provide one)
+    if (body.repoId && body.status) {
+      const { repoId, status, report, comment } = body;
+      
+      // Update repository analysis status
+      await convexClient.mutation(api.repos.updateRepoAnalysis, {
+        repoId: repoId as Id<"repos">,
+        analyzerStatus: status === "completed" ? "completed" : "failed",
+        lastAnalyzedAt: Date.now(),
+      });
+      
+      // If we have a comment/report, parse it and create tasks
+      if (comment || report) {
+        const reportData = comment 
+          ? parseCodeRabbitComment(comment)
+          : report;
+        
+        // Get repository to find userId
+        const repo = await convexClient.query(api.repos.getRepoById, {
+          repoId: repoId as Id<"repos">,
+        });
+        
+        if (repo) {
+          // Create tasks from report
+          const tasks = createTasksFromReport(
+            reportData,
+            repoId,
+            repo.userId
+          );
+          
+          // Create tasks in Convex
+          for (const task of tasks) {
+            await convexClient.mutation(api.tasks.createTask, {
+              userId: repo.userId,
+              repoId: repoId as Id<"repos">,
+              title: task.title,
+              description: task.description,
+              priority: task.priority,
+              initiator: "coderabbit",
+            });
+          }
+        }
+      }
+    }
 
     return NextResponse.json({ status: "ok" }, { status: 200 });
   } catch (error: any) {
     console.error("Webhook error:", error);
-    // Return 200 to prevent CodeRabbit from retrying
+    // Return 200 to prevent webhook from retrying
     // Log error for investigation
     return NextResponse.json(
       { error: "Webhook processing failed" },

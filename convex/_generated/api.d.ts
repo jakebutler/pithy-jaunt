@@ -9,6 +9,7 @@
  */
 
 import type * as repos from "../repos.js";
+import type * as tasks from "../tasks.js";
 import type * as users from "../users.js";
 
 import type {
@@ -19,6 +20,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   repos: typeof repos;
+  tasks: typeof tasks;
   users: typeof users;
 }>;
 
