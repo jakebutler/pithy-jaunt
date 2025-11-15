@@ -26,6 +26,7 @@ export function TaskLogs({ taskId }: TaskLogsProps) {
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const wasConnectedRef = useRef(false);
 
   useEffect(() => {
     // Create EventSource connection
@@ -35,6 +36,7 @@ export function TaskLogs({ taskId }: TaskLogsProps) {
     eventSource.onopen = () => {
       setIsConnected(true);
       setError(null);
+      wasConnectedRef.current = true;
     };
 
     eventSource.onmessage = (event) => {
@@ -47,14 +49,24 @@ export function TaskLogs({ taskId }: TaskLogsProps) {
     };
 
     eventSource.onerror = (err) => {
-      console.error("EventSource error:", err);
-      setIsConnected(false);
-      setError("Connection lost. Attempting to reconnect...");
-      eventSource.close();
+      // EventSource errors are common - only show error if we were connected
+      if (wasConnectedRef.current) {
+        console.error("EventSource error:", err);
+        setError("Connection lost. Attempting to reconnect...");
+        setIsConnected(false);
+      } else {
+        // Initial connection - might be 404 or auth error, check readyState
+        if (eventSource.readyState === EventSource.CLOSED) {
+          setError("Failed to connect to log stream. Logs may not be available yet.");
+        }
+      }
+      // Don't close immediately - EventSource will auto-reconnect
+      // Only close if we're unmounting (handled in cleanup)
     };
 
     // Cleanup on unmount
     return () => {
+      wasConnectedRef.current = false;
       eventSource.close();
     };
   }, [taskId]);
