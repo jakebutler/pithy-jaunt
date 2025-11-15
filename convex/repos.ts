@@ -108,3 +108,24 @@ export const getRepoByUrlAndUser = query({
   },
 });
 
+/**
+ * Get repository by owner and name (for webhook lookups)
+ */
+export const getRepoByOwnerAndName = query({
+  args: {
+    owner: v.string(),
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("repos")
+      .filter((q) => 
+        q.and(
+          q.eq(q.field("owner"), args.owner),
+          q.eq(q.field("name"), args.name)
+        )
+      )
+      .first();
+  },
+});
+

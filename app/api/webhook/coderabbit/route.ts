@@ -41,23 +41,48 @@ export async function POST(request: Request) {
       if (isCodeRabbitComment && body.pull_request) {
         // Extract repository info from PR
         const repoFullName = body.repository.full_name; // owner/repo
+        const [owner, name] = repoFullName.split("/");
         const commentBody = body.comment.body;
         
-        // Find repository in our database
-        // TODO: Store repo full name or match by URL
-        // For now, we'll need to match by owner/repo name
+        // Find repository in our database by owner/name
+        const repo = await convexClient.query(api.repos.getRepoByOwnerAndName, {
+          owner,
+          name,
+        });
+        
+        if (!repo) {
+          // Repository not found in our database, skip processing
+          return NextResponse.json({ status: "ok", message: "Repository not found" }, { status: 200 });
+        }
         
         // Parse CodeRabbit comment into structured report
         const report = parseCodeRabbitComment(commentBody);
         
-        // TODO: Get repoId from repository full name
-        // This requires querying Convex by owner/name
-        // For MVP, we'll need to store the mapping or query differently
-        
         // Create tasks from report
-        // Note: We need to find the repo by owner/name first
-        // This will be implemented when we add repository lookup by full name
-        // For now, this is a placeholder for the GitHub webhook flow
+        const tasks = createTasksFromReport(
+          report,
+          repo._id,
+          repo.userId
+        );
+        
+        // Create tasks in Convex
+        for (const task of tasks) {
+          await convexClient.mutation(api.tasks.createTask, {
+            userId: repo.userId,
+            repoId: repo._id,
+            title: task.title,
+            description: task.description,
+            priority: task.priority,
+            initiator: "coderabbit",
+          });
+        }
+        
+        // Update repository analysis status
+        await convexClient.mutation(api.repos.updateRepoAnalysis, {
+          repoId: repo._id,
+          analyzerStatus: "completed",
+          lastAnalyzedAt: Date.now(),
+        });
       }
     }
     
