@@ -5,8 +5,6 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { CodeRabbitReport } from "@/components/repos/CodeRabbitReport";
 import Link from "next/link";
-import { convexClient } from "@/lib/convex/server";
-import { api } from "@/convex/_generated/api";
 
 export default async function RepoDetailPage({
   params,
