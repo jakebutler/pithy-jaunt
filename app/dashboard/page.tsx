@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/auth/supabase-server";
 import { redirect } from "next/navigation";
+import { convexClient } from "@/lib/convex/server";
+import { api } from "@/convex/_generated/api";
+import Link from "next/link";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -12,18 +15,68 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  // Get user from Convex
+  const convexUser = await convexClient.query(
+    api.users.getUserBySupabaseId,
+    { supabaseUserId: session.user.id }
+  );
+
+  if (!convexUser) {
+    redirect("/login");
+  }
+
+  // Fetch user's repositories
+  const repos = await convexClient.query(api.repos.getReposByUser, {
+    userId: convexUser._id,
+  });
+
+  // Fetch user's tasks
+  const tasks = await convexClient.query(api.tasks.getTasksByUser, {
+    userId: convexUser._id,
+  });
+
+  // Calculate statistics
+  const stats = {
+    totalRepos: repos.length,
+    totalTasks: tasks.length,
+    tasksByStatus: {
+      queued: tasks.filter((t) => t.status === "queued").length,
+      running: tasks.filter((t) => t.status === "running").length,
+      completed: tasks.filter((t) => t.status === "completed").length,
+      failed: tasks.filter((t) => t.status === "failed").length,
+      needsReview: tasks.filter((t) => t.status === "needs_review").length,
+    },
+  };
+
+  // Get recent tasks
+  const recentTasks = tasks
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 5);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-bold">Pithy Jaunt</h1>
+              <Link href="/dashboard" className="text-xl font-bold">
+                Pithy Jaunt
+              </Link>
             </div>
-            <div className="flex items-center">
-              <span className="text-sm text-gray-700 mr-4">
-                {session.user.email}
-              </span>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/repos"
+                className="text-sm text-gray-700 hover:text-gray-900"
+              >
+                Repositories
+              </Link>
+              <Link
+                href="/tasks"
+                className="text-sm text-gray-700 hover:text-gray-900"
+              >
+                Tasks
+              </Link>
+              <span className="text-sm text-gray-700">{session.user.email}</span>
               <form action="/api/auth/logout" method="POST">
                 <button
                   type="submit"
@@ -39,17 +92,230 @@ export default async function DashboardPage() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="border-4 border-dashed border-gray-200 rounded-lg p-8 text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Welcome to Pithy Jaunt!
-            </h2>
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Dashboard
+            </h1>
             <p className="text-gray-600">
-              Your dashboard is coming soon. Connect a repository to get started.
+              Welcome back! Here's an overview of your repositories and tasks.
             </p>
+          </div>
+
+          {/* Statistics */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg
+                      className="h-6 w-6 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        Repositories
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {stats.totalRepos}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg
+                      className="h-6 w-6 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                      />
+                    </svg>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        Total Tasks
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {stats.totalTasks}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg
+                      className="h-6 w-6 text-blue-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        Running
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {stats.tasksByStatus.running}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg
+                      className="h-6 w-6 text-green-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        Completed
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {stats.tasksByStatus.completed}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Tasks */}
+          <div className="bg-white shadow rounded-lg mb-8">
+            <div className="px-4 py-5 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900">Recent Tasks</h2>
+                <Link
+                  href="/tasks"
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  View all
+                </Link>
+              </div>
+              {recentTasks.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No tasks yet. Create a task to get started.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {recentTasks.map((task) => (
+                    <Link
+                      key={task._id}
+                      href={`/tasks/${task._id}`}
+                      className="block p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="text-sm font-medium text-gray-900">
+                            {task.title}
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {new Date(task.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            task.status === "completed"
+                              ? "bg-green-100 text-green-800"
+                              : task.status === "running"
+                              ? "bg-blue-100 text-blue-800"
+                              : task.status === "failed"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {task.status}
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="bg-white shadow rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/repos"
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  Connect Repository
+                </Link>
+                {repos.length > 0 && (
+                  <Link
+                    href={`/repos/${repos[0]._id}/tasks/new`}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Create Task
+                  </Link>
+                )}
+                <Link
+                  href="/tasks"
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  View All Tasks
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </main>
     </div>
   );
 }
-

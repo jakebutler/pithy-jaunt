@@ -199,6 +199,28 @@ export default async function TaskDetailPage({
             </div>
           </div>
 
+          {/* Workspace Status */}
+          {task.assignedWorkspaceId && (
+            <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Workspace</h2>
+              <div className="space-y-2">
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Workspace ID</dt>
+                  <dd className="mt-1 text-sm text-gray-900 font-mono">{task.assignedWorkspaceId}</dd>
+                </div>
+                {/* TODO: Fetch workspace details for uptime */}
+                <WorkspaceStatus status="running" />
+              </div>
+            </div>
+          )}
+
+          {/* Execution Logs */}
+          {(task.status === "running" || task.status === "completed" || task.status === "failed") && (
+            <div className="mb-6">
+              <TaskLogs taskId={task._id} />
+            </div>
+          )}
+
           {/* Task Details */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Details</h2>
@@ -229,10 +251,12 @@ export default async function TaskDetailPage({
                   <dd className="mt-1 text-sm text-gray-900 font-mono">{task.branchName}</dd>
                 </div>
               )}
-              {task.assignedWorkspaceId && (
+              {task.modelPreference && (
                 <div>
-                  <dt className="text-sm font-medium text-gray-500">Workspace</dt>
-                  <dd className="mt-1 text-sm text-gray-900 font-mono">{task.assignedWorkspaceId}</dd>
+                  <dt className="text-sm font-medium text-gray-500">Model</dt>
+                  <dd className="mt-1 text-sm text-gray-900">
+                    {task.modelPreference.provider}/{task.modelPreference.model}
+                  </dd>
                 </div>
               )}
             </dl>
