@@ -6,11 +6,9 @@ const { alias: turbopackAlias } = env(nodeless, {});
 
 const nextConfig: NextConfig = {
   // Turbopack
-  experimental: {
-    turbo: {
-      resolveAlias: {
-        ...turbopackAlias,
-      },
+  turbopack: {
+    resolveAlias: {
+      ...turbopackAlias,
     },
   },
   // Webpack
