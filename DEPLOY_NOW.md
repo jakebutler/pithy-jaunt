@@ -81,8 +81,10 @@ Copy these from your `.env.local` to Vercel:
 **Before deploying Next.js**, deploy Convex:
 
 ```bash
-npx convex deploy --prod
+npx convex deploy
 ```
+
+(Convex deploys to production by default)
 
 This gives you production Convex URLs. Use these in Vercel env vars.
 
