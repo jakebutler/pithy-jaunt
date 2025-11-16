@@ -2,21 +2,21 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { POST as taskPOST } from '@/app/api/task/route';
 
 // Create mock functions that will be set up in beforeEach
-let mockGetSession: ReturnType<typeof vi.fn>;
+let mockGetUser: ReturnType<typeof vi.fn>;
 let mockConvexQuery: ReturnType<typeof vi.fn>;
 let mockConvexMutation: ReturnType<typeof vi.fn>;
 
 // Mock Supabase
 vi.mock('@/lib/auth/supabase-server', () => {
-  const mockGetSessionFn = vi.fn();
+  const mockGetUserFn = vi.fn();
   return {
     createClient: vi.fn(() => ({
       auth: {
-        getSession: mockGetSessionFn,
+        getUser: mockGetUserFn,
       },
     })),
     __mocks: {
-      getSession: mockGetSessionFn,
+      getUser: mockGetUserFn,
     },
   };
 });
@@ -44,17 +44,15 @@ describe('Task API Routes', () => {
     const { createClient } = await import('@/lib/auth/supabase-server');
     const { convexClient } = await import('@/lib/convex/server');
     const client = createClient() as any;
-    mockGetSession = client.auth.getSession;
+    mockGetUser = client.auth.getUser;
     mockConvexQuery = convexClient.query;
     mockConvexMutation = convexClient.mutation;
     
     // Set up default mocks for authenticated user
-    mockGetSession.mockResolvedValue({
+    mockGetUser.mockResolvedValue({
       data: {
-        session: {
-          user: {
-            id: 'user-123',
-          },
+        user: {
+          id: 'user-123',
         },
       },
     });

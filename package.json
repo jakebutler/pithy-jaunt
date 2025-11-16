@@ -36,7 +36,7 @@
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^5.1.1",
     "@vitest/ui": "^4.0.9",
-    "eslint": "^8",
+    "eslint": "^9",
     "eslint-config-next": "^15.0.3",
     "jsdom": "^27.2.0",
     "playwright": "^1.56.1",
@@ -44,5 +44,10 @@
     "tailwindcss": "^3.4.1",
     "typescript": "^5",
     "vitest": "^4.0.9"
+  },
+  "overrides": {
+    "rimraf": "^4.0.0",
+    "@humanwhocodes/object-schema": "npm:@eslint/object-schema@^2.1.0",
+    "@humanwhocodes/config-array": "npm:@eslint/config-array@^0.18.0"
   }
 }
