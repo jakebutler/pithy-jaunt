@@ -64,16 +64,11 @@ jobs:
           
           daytona --version
 
-      - name: Authenticate with Daytona
-        env:
-          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
-        run: |
-          daytona login --api-key "$DAYTONA_API_KEY" --no-interactive || echo "Login may have failed, but continuing..."
-
       - name: Create Daytona Workspace
         id: create-workspace
         env:
           DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+          DAYTONA_API_URL: https://app.daytona.io/api
           TARGET_REPO: ${{ inputs.repo_url }}
           BRANCH_NAME: pj/${{ inputs.task_id }}
           TASK_ID: ${{ inputs.task_id }}
