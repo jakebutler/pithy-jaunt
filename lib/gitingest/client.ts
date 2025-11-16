@@ -84,34 +84,29 @@ BOUNDARIES:
 
 SPECIFIC INSTRUCTIONS:
 1. Navigate to ${gitingestUrl}
-2. WAIT for the page to fully load (15-45 seconds) - the page uses JavaScript and may need to process the repository
-3. Check if the page is processing:
-   - If you see "Processing..." or "Loading..." text, wait patiently for it to complete
-   - The page may show a form with the repository URL pre-filled - this is normal, wait for processing
-   - Wait up to 120 seconds total for the page to finish processing and show the digest content
-   - DO NOT give up if you see "Processing..." - this means the page is working, just wait longer
-4. Once the page has loaded, locate the "Copy all" button:
-   - The button has the text "Copy all" and an onclick attribute: onclick="copyFullDigest()"
-   - It may be found using: document.querySelector('button[onclick="copyFullDigest()"]') or by text "Copy all"
-   - The button is typically in the Summary section
-5. Click the "Copy all" button:
-   - This will copy the complete digest content to the clipboard
-   - The button triggers the copyFullDigest() function which copies all content
-6. Extract the digest content using JavaScript:
+2. Immediately execute JavaScript to check page state:
+   - Execute: document.readyState (should be "complete" or "interactive")
+   - Execute: document.querySelectorAll('textarea').length (count textareas)
+   - Execute: document.querySelector('button[onclick*=\"copyFullDigest\"]') ? 'found' : 'not found' (check for Copy all button)
+3. WAIT for the page to fully load (15-45 seconds) - the page uses JavaScript and may need to process the repository
+4. Periodically check page state using JavaScript (every 10-15 seconds):
+   - Check if textareas exist: document.querySelectorAll('textarea').length > 0
+   - Check if button exists: document.querySelector('button[onclick*=\"copyFullDigest\"]') !== null
+   - Check page text content: document.body.innerText.includes('Repository:') || document.body.innerText.includes('Processing')
+5. If you see "Processing..." or "Loading..." text, wait patiently (up to 120 seconds total)
+6. Once textareas are detected (document.querySelectorAll('textarea').length > 0), extract content:
    - Execute: const textareas = Array.from(document.querySelectorAll('textarea'));
-   - Get the value from each textarea: textareas.map(ta => ta.value)
-   - Look for textareas that contain substantial content (1000+ characters)
-   - The textareas should be in sections labeled "Summary", "Directory Structure", and "Files Content"
-   - Combine all textarea values: textareas.map(ta => ta.value).join('\\n\\n')
-7. Also try to get content from clipboard after clicking "Copy all":
-   - Use: navigator.clipboard.readText() if available
-   - This may contain the complete digest content
-8. Use whichever method gives you the most complete content (clipboard or textarea extraction)
+   - Get values: textareas.map(ta => ta.value).filter(v => v.length > 100)
+   - Combine: textareas.map(ta => ta.value).filter(v => v.length > 100).join('\\n\\n')
+7. Also try clicking the "Copy all" button if it exists:
+   - Find: document.querySelector('button[onclick*=\"copyFullDigest\"]')
+   - Click it, then try: navigator.clipboard.readText()
+8. Use whichever method gives you the most complete content
 9. Verify the extracted content:
-   - Content should start with "Repository: [owner]/[repo]"
+   - Should start with "Repository: [owner]/[repo]"
    - Should contain "Directory structure:" section
-   - Should contain "FILE:" markers for individual files
-   - Total length should be 10,000+ characters (thousands of lines)
+   - Should contain "FILE:" markers
+   - Total length should be 10,000+ characters
 10. Return the complete, unmodified text content
 
 EXPECTED DATA FORMAT:
