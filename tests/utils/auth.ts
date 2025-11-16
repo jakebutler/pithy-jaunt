@@ -11,11 +11,14 @@ export interface TestUser {
 
 /**
  * Generate a unique test user email
+ * Uses a configurable domain from env or defaults to example.com
  */
 export function generateTestUserEmail(prefix = 'test-user'): string {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 8);
-  return `${prefix}-${timestamp}-${random}@test.example.com`;
+  // Use TEST_EMAIL_DOMAIN from env, or default to example.com (more likely to be accepted)
+  const domain = process.env.TEST_EMAIL_DOMAIN || 'example.com';
+  return `${prefix}-${timestamp}-${random}@${domain}`;
 }
 
 /**

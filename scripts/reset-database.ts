@@ -42,12 +42,10 @@ async function resetDatabase() {
     
     console.log("\n✅ Database reset complete!\n");
     
-    client.close();
     process.exit(0);
     
   } catch (error: any) {
     console.error("❌ Error:", error.message);
-    client.close();
     process.exit(1);
   }
 }
