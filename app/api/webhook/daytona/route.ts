@@ -53,6 +53,37 @@ export async function POST(request: Request) {
       }
     }
 
+    // Handle task progress updates
+    if (body.type === "task.progress") {
+      const { workspaceId, taskId, error } = body;
+      const message = error || body.message || "Task in progress";
+
+      console.log("[Daytona Webhook] Task progress:", {
+        taskId,
+        workspaceId,
+        message,
+      });
+
+      // Get task
+      const task = await convexClient.query(api.tasks.getTaskById, {
+        taskId: taskId as Id<"tasks">,
+      });
+
+      if (task) {
+        // Store progress log
+        try {
+          await convexClient.mutation(api.executionLogs.createLog, {
+            taskId: task._id,
+            workspaceId: workspaceId || task.assignedWorkspaceId || "",
+            logs: message,
+            status: "running",
+          });
+        } catch (logError) {
+          console.warn("[Daytona Webhook] Failed to store progress log:", logError);
+        }
+      }
+    }
+
     // Handle task execution completion
     if (body.type === "task.completed") {
       const { workspaceId, taskId, branchName, prUrl, status } = body;
