@@ -51,23 +51,24 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Install Homebrew
-        run: |
-          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          echo "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" >> $GITHUB_ENV
-          echo "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" >> $GITHUB_PATH
-
       - name: Install Daytona CLI
         run: |
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          brew install daytonaio/daytona/daytona
+          # Download latest Daytona CLI binary from GitHub releases
+          DAYTONA_VERSION=$(curl -s https://api.github.com/repos/daytonaio/daytona/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "Installing Daytona CLI version: $DAYTONA_VERSION"
+          
+          # Download and install
+          curl -L -o /tmp/daytona.tar.gz "https://github.com/daytonaio/daytona/releases/download/${DAYTONA_VERSION}/daytona-linux-amd64.tar.gz"
+          tar -xzf /tmp/daytona.tar.gz -C /tmp
+          sudo mv /tmp/daytona /usr/local/bin/daytona
+          sudo chmod +x /usr/local/bin/daytona
+          
           daytona --version
 
       - name: Authenticate with Daytona
         env:
           DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
         run: |
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           daytona auth login --api-key "$DAYTONA_API_KEY"
 
       - name: Create Daytona Workspace
@@ -86,7 +87,6 @@ jobs:
           WEBHOOK_URL: ${{ inputs.webhook_url }}
           KEEP_ALIVE: ${{ inputs.keep_alive }}
         run: |
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           echo "Creating Daytona workspace..."
           echo "Snapshot: ${{ inputs.snapshot_name }}"
           echo "Repository: ${{ inputs.repo_url }}"
