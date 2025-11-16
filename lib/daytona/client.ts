@@ -12,6 +12,7 @@
 
 const DAYTONA_API_URL = process.env.DAYTONA_API_URL || "http://localhost:3001";
 const DAYTONA_API_KEY = process.env.DAYTONA_API_KEY;
+const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "pithy-jaunt-dev";
 
 /**
  * Create a Daytona workspace
@@ -32,15 +33,34 @@ export async function createWorkspace(params: {
     throw new Error("DAYTONA_API_KEY environment variable is required");
   }
 
+  // Use snapshot name from environment variable (defaults to "pithy-jaunt-dev")
+  // This must match the snapshot name created in Daytona dashboard/CLI
+  const requestBody = {
+    snapshot: DAYTONA_SNAPSHOT_NAME,
+    repoUrl: params.repoUrl,
+    branch: params.branch,
+    env: {
+      TARGET_REPO: params.repoUrl,
+      BRANCH_NAME: `pj/${params.taskId}`,
+      TASK_ID: params.taskId,
+      AGENT_PROMPT: params.taskDescription,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
+      GITHUB_TOKEN: process.env.GITHUB_TOKEN || "",
+      MODEL_PROVIDER: params.modelProvider,
+      MODEL: params.model,
+      WEBHOOK_URL: `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")}/api/webhook/daytona`,
+      KEEP_ALIVE: params.keepWorkspaceAlive ? "true" : "false",
+    },
+  };
+
   console.log("[Daytona] Creating workspace:", {
     url: `${DAYTONA_API_URL}/workspace`,
     hasApiKey: !!DAYTONA_API_KEY,
     apiKeyLength: DAYTONA_API_KEY?.length || 0,
     apiKeyPrefix: DAYTONA_API_KEY?.substring(0, 10) || "none",
-    snapshot: "butlerjake/pithy-jaunt-daytona:v1.0.0",
-    template: "pithy-jaunt-dev",
-    repoUrl: params.repoUrl,
-    branch: params.branch,
+    snapshotName: DAYTONA_SNAPSHOT_NAME,
+    requestBody: JSON.stringify(requestBody, null, 2),
   });
 
   let response: Response;
@@ -52,28 +72,7 @@ export async function createWorkspace(params: {
         Authorization: `Bearer ${DAYTONA_API_KEY}`,
         "User-Agent": "PithyJaunt/1.0",
       },
-      body: JSON.stringify({
-        // Daytona requires snapshots to be created in the dashboard first
-        // Try snapshot name first (matches image name)
-        snapshot: "butlerjake/pithy-jaunt-daytona:v1.0.0",
-        // Also try template name as fallback
-        template: "pithy-jaunt-dev",
-        repoUrl: params.repoUrl,
-        branch: params.branch,
-        env: {
-          TARGET_REPO: params.repoUrl,
-          BRANCH_NAME: `pj/${params.taskId}`,
-          TASK_ID: params.taskId,
-          AGENT_PROMPT: params.taskDescription,
-          OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
-          ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
-          GITHUB_TOKEN: process.env.GITHUB_TOKEN || "",
-          MODEL_PROVIDER: params.modelProvider,
-          MODEL: params.model,
-          WEBHOOK_URL: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/webhook/daytona`,
-          KEEP_ALIVE: params.keepWorkspaceAlive ? "true" : "false",
-        },
-      }),
+      body: JSON.stringify(requestBody),
     });
   } catch (fetchError: any) {
     // Handle network errors, DNS errors, connection refused, etc.
@@ -131,12 +130,28 @@ export async function createWorkspace(params: {
       }
     }
     
+    // Try to parse as JSON for more detailed error
+    try {
+      const errorJson = JSON.parse(errorText);
+      if (errorJson.message || errorJson.error) {
+        errorMessage = errorJson.message || errorJson.error;
+      }
+      // Check for snapshot-related errors
+      if (errorJson.message?.toLowerCase().includes("snapshot") || 
+          errorJson.error?.toLowerCase().includes("snapshot")) {
+        console.error("[Daytona] Snapshot error detected:", errorJson);
+      }
+    } catch {
+      // Not JSON, use text as-is
+    }
+    
     console.error("[Daytona] API error:", {
       status: response.status,
       statusText: response.statusText,
       contentType,
       errorMessage,
       url: `${DAYTONA_API_URL}/workspace`,
+      requestBody: JSON.stringify(requestBody, null, 2),
     });
     
     throw new Error(
@@ -145,6 +160,27 @@ export async function createWorkspace(params: {
   }
 
   const data = await response.json();
+  
+  // Log the actual snapshot/image used by Daytona
+  const actualSnapshot = data.snapshot || data.image || "unknown";
+  const expectedSnapshot = DAYTONA_SNAPSHOT_NAME;
+  
+  console.log("[Daytona] Workspace created successfully:", {
+    workspaceId: data.workspaceId || data.id,
+    status: data.status || "creating",
+    expectedSnapshot,
+    actualSnapshot,
+    snapshotMatch: actualSnapshot === expectedSnapshot,
+    fullResponse: JSON.stringify(data, null, 2),
+  });
+  
+  // Warn if wrong snapshot is being used
+  if (actualSnapshot !== expectedSnapshot) {
+    console.warn("[Daytona] ⚠️ WARNING: Workspace is using wrong snapshot!");
+    console.warn(`[Daytona] Expected: ${expectedSnapshot}`);
+    console.warn(`[Daytona] Actual: ${actualSnapshot}`);
+    console.warn("[Daytona] This means the execution script won't run!");
+  }
   
   return {
     workspaceId: data.workspaceId || data.id,
@@ -185,9 +221,32 @@ export async function getWorkspaceStatus(workspaceId: string): Promise<{
 
   const data = await response.json();
   
+  // Map Daytona status to our status format
+  // Daytona uses: "started", "stopped", "terminated"
+  // We use: "running", "stopped", "terminated", "creating"
+  let mappedStatus: "creating" | "running" | "stopped" | "terminated" = "running";
+  const daytonaStatus = data.status || data.state || "unknown";
+  
+  if (daytonaStatus === "started" || daytonaStatus === "Started") {
+    mappedStatus = "running";
+  } else if (daytonaStatus === "stopped" || daytonaStatus === "Stopped") {
+    mappedStatus = "stopped";
+  } else if (daytonaStatus === "terminated" || daytonaStatus === "Terminated") {
+    mappedStatus = "terminated";
+  } else if (daytonaStatus === "creating" || daytonaStatus === "Creating") {
+    mappedStatus = "creating";
+  }
+  
+  console.log("[Daytona] Workspace status retrieved:", {
+    workspaceId: data.workspaceId || data.id || workspaceId,
+    daytonaStatus,
+    mappedStatus,
+    snapshot: data.snapshot || data.image,
+  });
+  
   return {
     workspaceId: data.workspaceId || data.id || workspaceId,
-    status: data.status || "running",
+    status: mappedStatus,
   };
 }
 
