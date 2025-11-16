@@ -64,8 +64,47 @@ async function fetchFromGitIngestUrl(repoUrl: string): Promise<string> {
 }
 
 /**
+ * Process a repository through GitIngest using NPM package
+ */
+async function processWithNpmPackage(repoUrl: string): Promise<string> {
+  const gitingest = await getGitingestNpm();
+  if (!gitingest) {
+    throw new Error("NPM package not available");
+  }
+
+  try {
+    // Use the NPM package's ingest function
+    // The package may export ingest directly or as a default export
+    const ingestFn = gitingest.ingest || gitingest.default?.ingest || gitingest;
+    
+    if (typeof ingestFn !== "function") {
+      throw new Error("NPM package does not export an ingest function");
+    }
+
+    const result = await ingestFn(repoUrl);
+    
+    // The result should be an object with summary, tree, and content
+    // Combine them as per GitIngest documentation
+    if (typeof result === "string") {
+      return result;
+    }
+    
+    if (result && typeof result === "object") {
+      const summary = result.summary || "";
+      const tree = result.tree || "";
+      const content = result.content || "";
+      return `${summary}\n\n${tree}\n\n${content}`;
+    }
+    
+    throw new Error("Unexpected result format from NPM package");
+  } catch (error: any) {
+    throw new Error(`NPM package failed: ${error.message || String(error)}`);
+  }
+}
+
+/**
  * Process a repository through GitIngest
- * Tries Python package first, falls back to URL hack if Python is not available
+ * Tries NPM package first (works in Vercel), falls back to Python if available
  * 
  * @param repoUrl - The GitHub repository URL
  * @param useCloud - Not used (kept for API compatibility)
@@ -75,7 +114,21 @@ export async function processGitIngest(
   repoUrl: string,
   useCloud: boolean = true
 ): Promise<string> {
-  // First, try Python approach (for local development or environments with Python)
+  // First, try NPM package (works in Vercel/serverless)
+  try {
+    return await processWithNpmPackage(repoUrl);
+  } catch (error: any) {
+    // If NPM package is not available or fails, fall through to Python
+    if (!error.message.includes("not available")) {
+      console.log(
+        "NPM package failed, falling back to Python:",
+        error.message
+      );
+    }
+    // Fall through to Python approach
+  }
+
+  // Fall back to Python approach (for local development or environments with Python)
   try {
     const fs = await import("fs/promises");
     try {
