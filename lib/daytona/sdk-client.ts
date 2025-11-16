@@ -67,6 +67,24 @@ export async function createWorkspaceViaSDK(
     // The snapshot name should be the name registered in Daytona (e.g., "pithy-jaunt-dev")
     console.log("[Daytona SDK] Creating workspace with snapshot:", DAYTONA_SNAPSHOT_NAME);
     
+    // First, try to verify the snapshot exists (optional check)
+    try {
+      const snapshots = await daytona.snapshot.list();
+      const snapshotExists = snapshots.some((s: any) => s.name === DAYTONA_SNAPSHOT_NAME);
+      console.log("[Daytona SDK] Snapshot check:", {
+        snapshotName: DAYTONA_SNAPSHOT_NAME,
+        exists: snapshotExists,
+        availableSnapshots: snapshots.map((s: any) => s.name),
+      });
+      
+      if (!snapshotExists) {
+        console.warn(`[Daytona SDK] Snapshot "${DAYTONA_SNAPSHOT_NAME}" not found. Available snapshots:`, snapshots.map((s: any) => s.name));
+      }
+    } catch (snapshotCheckError: any) {
+      console.warn("[Daytona SDK] Could not verify snapshot existence:", snapshotCheckError.message);
+      // Continue anyway - the create call will fail if snapshot doesn't exist
+    }
+    
     const sandbox = await daytona.create({
       snapshot: DAYTONA_SNAPSHOT_NAME,
       envVars,
