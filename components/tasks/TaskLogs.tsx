@@ -30,10 +30,13 @@ export function TaskLogs({ taskId }: TaskLogsProps) {
 
   useEffect(() => {
     // Create EventSource connection
-    const eventSource = new EventSource(`/api/task/${taskId}/logs`);
+    const url = `/api/task/${taskId}/logs`;
+    console.log("[TaskLogs] Connecting to:", url);
+    const eventSource = new EventSource(url);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
+      console.log("[TaskLogs] Connection opened");
       setIsConnected(true);
       setError(null);
       wasConnectedRef.current = true;
@@ -42,22 +45,31 @@ export function TaskLogs({ taskId }: TaskLogsProps) {
     eventSource.onmessage = (event) => {
       try {
         const logEvent: LogEvent = JSON.parse(event.data);
+        console.log("[TaskLogs] Received log event:", logEvent);
         setLogs((prev) => [...prev, logEvent]);
       } catch (err) {
-        console.error("Failed to parse log event:", err);
+        console.error("[TaskLogs] Failed to parse log event:", err, event.data);
       }
     };
 
     eventSource.onerror = (err) => {
+      console.error("[TaskLogs] EventSource error:", {
+        readyState: eventSource.readyState,
+        url,
+        error: err,
+      });
+      
       // EventSource errors are common - only show error if we were connected
       if (wasConnectedRef.current) {
-        console.error("EventSource error:", err);
         setError("Connection lost. Attempting to reconnect...");
         setIsConnected(false);
       } else {
         // Initial connection - might be 404 or auth error, check readyState
         if (eventSource.readyState === EventSource.CLOSED) {
           setError("Failed to connect to log stream. Logs may not be available yet.");
+          console.error("[TaskLogs] Connection closed immediately. Check if route exists and is accessible.");
+        } else if (eventSource.readyState === EventSource.CONNECTING) {
+          console.log("[TaskLogs] Still connecting...");
         }
       }
       // Don't close immediately - EventSource will auto-reconnect
