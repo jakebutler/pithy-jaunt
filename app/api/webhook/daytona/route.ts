@@ -35,6 +35,55 @@ export async function POST(request: Request) {
       headers: Object.fromEntries(request.headers.entries()),
     });
 
+    // Handle workspace creation (from GitHub Actions)
+    if (body.type === "workspace.created") {
+      const { workspaceId, taskId, status, source } = body;
+
+      console.log("[Daytona Webhook] Workspace created:", {
+        taskId,
+        workspaceId,
+        source,
+      });
+
+      // Get task to update workspace ID
+      const task = await convexClient.query(api.tasks.getTaskById, {
+        taskId: taskId as Id<"tasks">,
+      });
+
+      if (task) {
+        // Update task with actual workspace ID (replacing placeholder)
+        await convexClient.mutation(api.tasks.updateTaskWorkspace, {
+          taskId: task._id,
+          workspaceId: workspaceId,
+        });
+
+        // Create or update workspace record
+        try {
+          const existingWorkspace = await convexClient.query(
+            api.workspaces.getWorkspaceByDaytonaId,
+            { daytonaId: workspaceId }
+          );
+
+          if (!existingWorkspace) {
+            // Create new workspace record
+            await convexClient.mutation(api.workspaces.createWorkspace, {
+              daytonaId: workspaceId,
+              assignedTaskId: task._id,
+              status: (status || "creating") as "creating" | "running" | "stopped" | "terminated",
+            });
+          } else {
+            // Update existing workspace
+            await convexClient.mutation(api.workspaces.updateWorkspaceStatus, {
+              workspaceId: existingWorkspace._id,
+              status: (status || "creating") as "creating" | "running" | "stopped" | "terminated",
+            });
+          }
+        } catch (workspaceError) {
+          console.warn("[Daytona Webhook] Failed to create/update workspace:", workspaceError);
+        }
+      }
+    }
+
     // Handle workspace status updates
     if (body.type === "workspace.status") {
       const { workspaceId, status } = body;

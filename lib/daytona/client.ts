@@ -3,7 +3,14 @@
  * 
  * Handles communication with Daytona API for workspace management
  * 
- * TODO: Implement based on Daytona API documentation
+ * NOTE: The REST API may not support custom snapshots. If the API doesn't work,
+ * this client will fall back to using the Daytona CLI (if available).
+ * 
+ * For production/serverless environments (like Vercel), consider:
+ * - Using a separate service/worker with Daytona CLI installed
+ * - Using a GitHub Action or CI/CD pipeline
+ * - Contacting Daytona support about REST API snapshot support
+ * 
  * Expected endpoints:
  * - POST /workspace (create workspace)
  * - GET /workspace/{id} (get workspace status)
@@ -13,6 +20,8 @@
 const DAYTONA_API_URL = process.env.DAYTONA_API_URL || "http://localhost:3001";
 const DAYTONA_API_KEY = process.env.DAYTONA_API_KEY;
 const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "pithy-jaunt-dev";
+const USE_CLI_FALLBACK = process.env.DAYTONA_USE_CLI_FALLBACK === "true";
+const USE_GITHUB_ACTIONS = process.env.DAYTONA_USE_GITHUB_ACTIONS === "true";
 
 /**
  * Create a Daytona workspace
@@ -29,6 +38,21 @@ export async function createWorkspace(params: {
   workspaceId: string;
   status: "creating" | "running";
 }> {
+  // If GitHub Actions is enabled, use it directly (bypasses REST API issues)
+  if (USE_GITHUB_ACTIONS) {
+    console.log("[Daytona] Using GitHub Actions to create workspace");
+    const { createWorkspaceViaGitHubActions, isGitHubActionsAvailable } = await import("./github-actions-client");
+    
+    if (!isGitHubActionsAvailable()) {
+      throw new Error(
+        "GitHub Actions is enabled but required environment variables are missing. " +
+        "Need: GITHUB_TOKEN, GITHUB_REPO_OWNER, GITHUB_REPO_NAME"
+      );
+    }
+    
+    return await createWorkspaceViaGitHubActions(params);
+  }
+
   if (!DAYTONA_API_KEY) {
     throw new Error("DAYTONA_API_KEY environment variable is required");
   }
@@ -180,6 +204,29 @@ export async function createWorkspace(params: {
     console.warn(`[Daytona] Expected: ${expectedSnapshot}`);
     console.warn(`[Daytona] Actual: ${actualSnapshot}`);
     console.warn("[Daytona] This means the execution script won't run!");
+    
+    // If CLI fallback is enabled and snapshot doesn't match, try CLI
+    if (USE_CLI_FALLBACK) {
+      console.log("[Daytona] Attempting CLI fallback due to wrong snapshot...");
+      try {
+        const { createWorkspaceViaCLI, isCLIAvailable } = await import("./cli-client");
+        if (await isCLIAvailable()) {
+          console.log("[Daytona] CLI available, retrying with CLI...");
+          // Clean up the incorrectly created workspace
+          try {
+            await terminateWorkspace(data.workspaceId || data.id);
+          } catch {
+            // Ignore cleanup errors
+          }
+          return await createWorkspaceViaCLI(params);
+        } else {
+          console.warn("[Daytona] CLI not available, cannot use fallback");
+        }
+      } catch (cliError: any) {
+        console.error("[Daytona] CLI fallback failed:", cliError.message);
+        // Continue with the REST API result (even though it's wrong)
+      }
+    }
   }
   
   return {

@@ -1,0 +1,163 @@
+name: Create Daytona Workspace
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: 'Task ID'
+        required: true
+        type: string
+      repo_url:
+        description: 'Repository URL'
+        required: true
+        type: string
+      branch:
+        description: 'Branch name'
+        required: true
+        type: string
+      task_description:
+        description: 'Task description'
+        required: true
+        type: string
+      model_provider:
+        description: 'Model provider (openai or anthropic)'
+        required: true
+        type: choice
+        options:
+          - openai
+          - anthropic
+      model:
+        description: 'Model name'
+        required: true
+        type: string
+      snapshot_name:
+        description: 'Daytona snapshot name'
+        required: true
+        type: string
+        default: 'pithy-jaunt-dev'
+      webhook_url:
+        description: 'Webhook URL for callbacks'
+        required: true
+        type: string
+      keep_alive:
+        description: 'Keep workspace alive after completion (true/false)'
+        required: false
+        type: string
+        default: 'false'
+
+jobs:
+  create-workspace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Install Daytona CLI
+        run: |
+          curl -fsSL https://download.daytona.io/daytona/install.sh | sh
+          echo "$HOME/.daytona/bin" >> $GITHUB_PATH
+
+      - name: Authenticate with Daytona
+        env:
+          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+        run: |
+          daytona auth login --api-key "$DAYTONA_API_KEY"
+
+      - name: Create Daytona Workspace
+        id: create-workspace
+        env:
+          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+          TARGET_REPO: ${{ inputs.repo_url }}
+          BRANCH_NAME: pj/${{ inputs.task_id }}
+          TASK_ID: ${{ inputs.task_id }}
+          AGENT_PROMPT: ${{ inputs.task_description }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MODEL_PROVIDER: ${{ inputs.model_provider }}
+          MODEL: ${{ inputs.model }}
+          WEBHOOK_URL: ${{ inputs.webhook_url }}
+          KEEP_ALIVE: ${{ inputs.keep_alive }}
+        run: |
+          echo "Creating Daytona workspace..."
+          echo "Snapshot: ${{ inputs.snapshot_name }}"
+          echo "Repository: ${{ inputs.repo_url }}"
+          echo "Branch: ${{ inputs.branch }}"
+          
+          # Create workspace using CLI
+          OUTPUT=$(daytona sandbox create \
+            --snapshot "${{ inputs.snapshot_name }}" \
+            --repo "${{ inputs.repo_url }}" \
+            --branch "${{ inputs.branch }}" \
+            --env "TARGET_REPO=${{ inputs.repo_url }}" \
+            --env "BRANCH_NAME=pj/${{ inputs.task_id }}" \
+            --env "TASK_ID=${{ inputs.task_id }}" \
+            --env "AGENT_PROMPT=${{ inputs.task_description }}" \
+            --env "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" \
+            --env "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" \
+            --env "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" \
+            --env "MODEL_PROVIDER=${{ inputs.model_provider }}" \
+            --env "MODEL=${{ inputs.model }}" \
+            --env "WEBHOOK_URL=${{ inputs.webhook_url }}" \
+            --env "KEEP_ALIVE=${{ inputs.keep_alive }}" \
+            --output json 2>&1) || {
+            echo "Failed to create workspace"
+            echo "$OUTPUT"
+            exit 1
+          }
+          
+          # Extract workspace ID from output
+          WORKSPACE_ID=$(echo "$OUTPUT" | jq -r '.id // .workspaceId // .sandboxId // empty' 2>/dev/null || echo "")
+          
+          if [ -z "$WORKSPACE_ID" ]; then
+            # Try to extract from text output
+            WORKSPACE_ID=$(echo "$OUTPUT" | grep -oE '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1)
+          fi
+          
+          if [ -z "$WORKSPACE_ID" ]; then
+            echo "Error: Could not extract workspace ID from output"
+            echo "Output: $OUTPUT"
+            exit 1
+          fi
+          
+          echo "workspace_id=$WORKSPACE_ID" >> $GITHUB_OUTPUT
+          echo "Workspace created successfully: $WORKSPACE_ID"
+
+      - name: Send Webhook Notification
+        if: always()
+        env:
+          WEBHOOK_URL: ${{ inputs.webhook_url }}
+        run: |
+          STATUS="${{ job.status }}"
+          WORKSPACE_ID="${{ steps.create-workspace.outputs.workspace_id }}"
+          
+          if [ "$STATUS" = "success" ]; then
+            PAYLOAD=$(cat <<EOF
+          {
+            "type": "workspace.created",
+            "taskId": "${{ inputs.task_id }}",
+            "workspaceId": "$WORKSPACE_ID",
+            "status": "creating",
+            "source": "github-actions"
+          }
+          EOF
+          )
+          else
+            PAYLOAD=$(cat <<EOF
+          {
+            "type": "workspace.failed",
+            "taskId": "${{ inputs.task_id }}",
+            "status": "failed",
+            "error": "Failed to create workspace via GitHub Actions",
+            "source": "github-actions"
+          }
+          EOF
+          )
+          fi
+          
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            --max-time 10 \
+            --silent \
+            --show-error || echo "Warning: Webhook delivery failed"
+
