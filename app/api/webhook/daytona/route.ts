@@ -54,7 +54,7 @@ export async function POST(request: Request) {
         // Update task with actual workspace ID (replacing placeholder)
         await convexClient.mutation(api.tasks.updateTaskWorkspace, {
           taskId: task._id,
-          workspaceId: workspaceId,
+          assignedWorkspaceId: workspaceId,
         });
 
         // Create or update workspace record
