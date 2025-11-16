@@ -44,40 +44,44 @@ async function processWithBrowserUseCloud(repoUrl: string): Promise<string> {
     );
   }
 
-  // Task description for the browser agent
-  // Make it more explicit and actionable based on actual GitIngest.com behavior
-  const task = `Extract the complete codebase digest from GitIngest.com for repository: ${repoUrl}
+  // Task description following Browser Use Cloud best practices:
+  // - Be specific: exact actions and elements
+  // - Set boundaries: single page, specific elements
+  // - Include context: data format and expected content
+  const task = `Extract the complete codebase digest text from GitIngest.com for repository: ${repoUrl}
 
-CRITICAL: GitIngest.com loads content dynamically via JavaScript. You MUST wait for the content to fully render before extracting.
+BOUNDARIES:
+- Visit ONLY: https://gitingest.com/ (single page)
+- Extract content ONLY from textarea or pre elements on this page
+- Wait maximum 180 seconds for processing
 
-Step-by-step instructions:
+SPECIFIC INSTRUCTIONS:
 1. Navigate to https://gitingest.com/
-2. Find the text input field with placeholder "https://github.com/..." (it's a textbox element)
-3. Clear the field and enter this exact URL: ${repoUrl}
-4. Click the "Ingest" button (it's a button element next to the input)
-5. IMPORTANT: Wait for the page to process. You'll see:
-   - The page may show a loading state or spinner
-   - The URL may change to show the repository path
-   - Content will appear below the form
-6. Wait AT LEAST 60-90 seconds for processing to complete (large repos take time)
-7. Once content appears, look for:
-   - A large textarea or pre element containing the digest
-   - The content should be visible on the page (not hidden)
-   - It may be in a scrollable container
-8. Use JavaScript to extract the content if needed:
-   - Execute: document.querySelector('textarea')?.value or document.querySelector('pre')?.textContent
-   - Check all textarea and pre elements on the page
-   - Look for content that starts with "Repository:" and contains "Directory structure:"
-9. If content is not visible, wait longer and check again - GitIngest can take 2-3 minutes for large repos
-10. Extract ALL text content - it should be thousands of lines (10,000+ characters minimum)
+2. Locate the text input field (textbox with placeholder "https://github.com/...")
+3. Clear any existing text and enter exactly: ${repoUrl}
+4. Click the "Ingest" button (button element immediately next to the input field)
+5. Wait for processing to complete:
+   - Monitor the page for 60-180 seconds
+   - Look for URL changes or loading indicators
+   - Wait until a textarea or pre element appears with substantial content (10,000+ characters)
+6. Extract the digest content:
+   - Find the textarea or pre element containing the digest
+   - Use JavaScript if needed: document.querySelector('textarea')?.value || document.querySelector('pre')?.textContent
+   - Verify content starts with "Repository:" and contains "Directory structure:" and "FILE:"
+7. Return the complete, unmodified text content
 
-Critical requirements:
-- Wait patiently - GitIngest processing can take 60-180 seconds
-- Do NOT give up if content doesn't appear immediately
-- Use JavaScript evaluation to extract from textarea/pre elements if direct extraction fails
-- Return the COMPLETE, UNMODIFIED digest text - do NOT summarize
-- The content must include "Repository:", "Directory structure:", and "FILE:" sections
-- If the page shows an error or times out, report the error but keep trying`;
+EXPECTED DATA FORMAT:
+- Content starts with: "Repository: [owner]/[repo]"
+- Contains: "Directory structure:" section
+- Contains: "FILE:" markers for each file
+- Total length: 10,000+ characters (thousands of lines)
+- Format: Plain text, no HTML markup
+
+CRITICAL REQUIREMENTS:
+- Do NOT summarize, truncate, or modify the content
+- Return the FULL text exactly as displayed
+- If content doesn't appear after 180 seconds, report the error
+- Use JavaScript evaluation if direct element access fails`;
 
   try {
     let result: any = null;
@@ -86,7 +90,10 @@ Critical requirements:
     if (BrowserUseClient && typeof BrowserUseClient === "function") {
       try {
         const client = new BrowserUseClient({ apiKey });
-        const browserTask = await client.tasks.createTask({ task });
+        const browserTask = await client.tasks.createTask({ 
+          task,
+          llm: "gpt-4.1", // Use more capable model for better reliability
+        });
         result = await browserTask.complete();
       } catch (sdkError: any) {
         console.log("SDK failed, falling back to REST API:", sdkError.message);
