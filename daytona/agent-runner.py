@@ -13,7 +13,7 @@ import sys
 import subprocess
 import re
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple
 import signal
 from contextlib import contextmanager
 
@@ -50,6 +50,59 @@ def timeout(seconds: int):
         # Restore old handler and cancel alarm
         signal.alarm(0)
         signal.signal(signal.SIGALRM, old_handler)
+
+
+def find_relevant_files(repo_path: Path, task_description: str, max_files: int = 10) -> List[Tuple[str, str]]:
+    """
+    Find files that are likely relevant to the task.
+    Returns a list of (file_path, content) tuples.
+    """
+    relevant_files = []
+    task_lower = task_description.lower()
+    
+    # Keywords that might indicate which files to read
+    keywords = []
+    if any(word in task_lower for word in ["api", "route", "endpoint", "handler"]):
+        keywords.extend(["api", "route", "handler", "controller"])
+    if any(word in task_lower for word in ["component", "ui", "page", "view"]):
+        keywords.extend(["component", "page", "view", "ui"])
+    if any(word in task_lower for word in ["config", "setting"]):
+        keywords.extend(["config", "setting", ".env"])
+    if any(word in task_lower for word in ["test", "spec"]):
+        keywords.extend(["test", "spec"])
+    
+    # Find files matching keywords or common patterns
+    files_to_check = []
+    for file_path in repo_path.rglob("*"):
+        if file_path.is_file() and not any(part.startswith(".") for part in file_path.parts):
+            # Skip large files and binary files
+            if file_path.stat().st_size > 100000:  # Skip files > 100KB
+                continue
+            
+            file_name = file_path.name.lower()
+            file_path_str = str(file_path.relative_to(repo_path))
+            
+            # Check if file matches keywords or is in common directories
+            if any(keyword in file_name or keyword in file_path_str.lower() for keyword in keywords):
+                files_to_check.append(file_path)
+            elif any(part in ["src", "lib", "app", "components", "pages", "api"] for part in file_path.parts):
+                files_to_check.append(file_path)
+    
+    # Read file contents (limit to avoid token limits)
+    for file_path in files_to_check[:max_files]:
+        try:
+            # Try to read as text
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+                # Limit content size to avoid token limits
+                if len(content) > 5000:
+                    content = content[:5000] + "\n... (truncated)"
+                relevant_files.append((str(file_path.relative_to(repo_path)), content))
+        except Exception:
+            # Skip files that can't be read
+            continue
+    
+    return relevant_files
 
 
 def analyze_codebase(repo_path: Path) -> Dict[str, Any]:
@@ -128,6 +181,7 @@ def generate_patch_openai(
     task_description: str,
     codebase_analysis: Dict[str, Any],
     coderabbit_analysis: Optional[str],
+    relevant_files: List[Tuple[str, str]],
     model: str = "gpt-4o",
     api_key: Optional[str] = None,
 ) -> str:
@@ -153,10 +207,16 @@ Codebase Analysis:
 - Top-level structure: {', '.join(codebase_analysis.get('file_structure', [])[:20])}
 """
     
-    if coderabbit_analysis:
-        user_prompt += f"\nCodeRabbit Analysis:\n{coderabbit_analysis}\n"
+    # Include relevant file contents
+    if relevant_files:
+        user_prompt += "\n\nRelevant Files:\n"
+        for file_path, content in relevant_files:
+            user_prompt += f"\n--- File: {file_path} ---\n{content}\n"
     
-    user_prompt += "\nGenerate a unified diff patch that implements the task. Output ONLY the diff, no explanations."
+    if coderabbit_analysis:
+        user_prompt += f"\n\nCodeRabbit Analysis:\n{coderabbit_analysis}\n"
+    
+    user_prompt += "\n\nGenerate a unified diff patch that implements the task. The diff must use the EXACT context lines from the files shown above. Output ONLY the diff, no explanations."
     
     try:
         with timeout(180):  # 3 minute timeout
@@ -188,6 +248,7 @@ def generate_patch_anthropic(
     task_description: str,
     codebase_analysis: Dict[str, Any],
     coderabbit_analysis: Optional[str],
+    relevant_files: List[Tuple[str, str]],
     model: str = "claude-3-5-sonnet-20241022",
     api_key: Optional[str] = None,
 ) -> str:
@@ -213,10 +274,16 @@ Codebase Analysis:
 - Top-level structure: {', '.join(codebase_analysis.get('file_structure', [])[:20])}
 """
     
-    if coderabbit_analysis:
-        user_prompt += f"\nCodeRabbit Analysis:\n{coderabbit_analysis}\n"
+    # Include relevant file contents
+    if relevant_files:
+        user_prompt += "\n\nRelevant Files:\n"
+        for file_path, content in relevant_files:
+            user_prompt += f"\n--- File: {file_path} ---\n{content}\n"
     
-    user_prompt += "\nGenerate a unified diff patch that implements the task. Output ONLY the diff, no explanations."
+    if coderabbit_analysis:
+        user_prompt += f"\n\nCodeRabbit Analysis:\n{coderabbit_analysis}\n"
+    
+    user_prompt += "\n\nGenerate a unified diff patch that implements the task. The diff must use the EXACT context lines from the files shown above. Output ONLY the diff, no explanations."
     
     try:
         with timeout(180):  # 3 minute timeout
@@ -309,6 +376,16 @@ def main():
         print(f"[pj] Warning: Could not analyze codebase: {e}", file=sys.stderr)
         codebase_analysis = {}
     
+    # Find relevant files based on task
+    try:
+        relevant_files = find_relevant_files(args.repo_path, args.task, max_files=10)
+        print(f"[pj] Found {len(relevant_files)} relevant files", file=sys.stderr)
+        for file_path, _ in relevant_files:
+            print(f"[pj]   - {file_path}", file=sys.stderr)
+    except Exception as e:
+        print(f"[pj] Warning: Could not find relevant files: {e}", file=sys.stderr)
+        relevant_files = []
+    
     # Load CodeRabbit analysis if provided
     coderabbit_analysis = None
     if args.coderabbit_analysis and args.coderabbit_analysis.exists():
@@ -326,6 +403,7 @@ def main():
                 args.task,
                 codebase_analysis,
                 coderabbit_analysis,
+                relevant_files,
                 model=model,
             )
         elif provider == "anthropic":
@@ -334,6 +412,7 @@ def main():
                 args.task,
                 codebase_analysis,
                 coderabbit_analysis,
+                relevant_files,
                 model=model,
             )
         else:

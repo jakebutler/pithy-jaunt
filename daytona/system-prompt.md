@@ -16,9 +16,12 @@ You MUST output your changes as a **unified diff** format that can be applied wi
 
 - Use standard unified diff format with `---` and `+++` headers
 - Include file paths relative to the repository root
-- Show context lines (at least 3 lines before and after changes)
+- **CRITICAL**: Use the EXACT context lines from the files provided in the prompt - do not modify or guess context lines
+- Show context lines (at least 3 lines before and after changes) that match EXACTLY what's in the source files
 - Be syntactically correct and apply cleanly
 - Include all necessary imports and dependencies
+
+**IMPORTANT**: When files are provided in the prompt, you MUST use the exact lines from those files as context in your diff. Do not generate context lines - copy them exactly from the provided file contents.
 
 ## Code Generation Guidelines
 
