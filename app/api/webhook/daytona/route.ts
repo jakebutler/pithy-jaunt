@@ -16,6 +16,8 @@ import { Id } from "@/convex/_generated/dataModel";
  * TODO: Implement webhook signature verification if Daytona provides it
  */
 export async function POST(request: Request) {
+  const startTime = Date.now();
+  
   try {
     // TODO: Verify webhook signature if Daytona provides it
     // const signature = request.headers.get("x-daytona-signature");
@@ -29,6 +31,8 @@ export async function POST(request: Request) {
       type: body.type,
       taskId: body.taskId,
       workspaceId: body.workspaceId,
+      timestamp: new Date().toISOString(),
+      headers: Object.fromEntries(request.headers.entries()),
     });
 
     // Handle workspace status updates
