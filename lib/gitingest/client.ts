@@ -84,38 +84,42 @@ BOUNDARIES:
 
 SPECIFIC INSTRUCTIONS:
 1. Navigate to ${gitingestUrl}
-2. Wait 30 seconds for initial page load
-3. Check for content using JavaScript (repeat every 15 seconds, up to 120 seconds total):
+2. Wait 45 seconds for initial page load (GitIngest needs time to process)
+3. Check for content using JavaScript (repeat every 20 seconds, up to 180 seconds total):
    - Execute: const resultContent = document.querySelector('#result-content');
    - Execute: const content = resultContent ? resultContent.value : '';
    - Execute: const hasContent = content && content.length > 1000;
    - If hasContent is true, proceed to step 4
    - If hasContent is false, wait 15 more seconds and check again
 4. Extract content from #result-content textarea:
-   - Execute: const content = document.querySelector('#result-content').value;
-   - Check the length: content.length
-   - If content.length > 1000, this is good content - proceed
-   - Store this as the primary content
-5. ALWAYS try to click "Copy all" button to get complete content (even if #result-content has content):
+   - Execute: const textareaContent = document.querySelector('#result-content').value;
+   - Check the length: textareaContent.length
+   - Store this content (even if it says "cropped" - it may still be substantial)
+5. ALWAYS click "Copy all" button to get complete content:
    - Find the button: document.querySelector('button[onclick*=\"copyFullDigest\"]')
    - Click it
-   - Wait 3 seconds for clipboard to update
-   - Read from clipboard: navigator.clipboard.readText().then(text => text).catch(() => '')
-   - The clipboard may contain the FULL content even if textarea is cropped
-6. If clipboard read fails or is empty, try "Download" button:
+   - Wait 5 seconds for clipboard to update
+   - Read from clipboard: await navigator.clipboard.readText()
+   - The clipboard should contain the FULL, UNTRUNCATED content
+6. Compare content lengths and use the LONGEST:
+   - textareaLength = textareaContent.length
+   - clipboardLength = (clipboard content).length
+   - Use whichever is LONGER
+7. If clipboard is empty or shorter, try "Download" button:
    - Find button with text "Download" or download icon
    - Click it to trigger download
-   - Wait 5 seconds for download
-   - The downloaded file should contain the full content
-7. Use content in priority order (use the LONGEST available):
-   - FIRST: Clipboard content from "Copy all" (if length > content from textarea)
-   - SECOND: #result-content textarea value (if length > 1000)
-   - THIRD: Downloaded file content (if available)
-   - FOURTH: Longest textarea value from all textareas
-8. Return the content:
-   - Return the LONGEST content available (even if it says "cropped")
-   - Do NOT summarize or truncate - return exactly as extracted
+   - Wait 10 seconds for download to complete
+   - Read the downloaded file content
+8. Final content selection (use LONGEST available):
+   - FIRST: Clipboard content (from "Copy all") - should be the longest
+   - SECOND: Downloaded file content
+   - THIRD: #result-content textarea value
+   - FOURTH: Longest textarea from all textareas
+9. Return the content:
+   - Return the COMPLETE, UNMODIFIED content (do not summarize)
+   - Return ALL characters - even if it's 300k+ characters
    - Content should start with "Repository:" and contain "Directory structure:" and "FILE:"
+   - Do NOT truncate or summarize - return the FULL text
 
 EXPECTED DATA FORMAT:
 - Content starts with: "Repository: [owner]/[repo]"
@@ -130,7 +134,7 @@ CRITICAL REQUIREMENTS:
 - Extract from all textarea elements on the page and combine them
 - Do NOT summarize, truncate, or modify the content
 - Return the FULL text exactly as displayed
-- If content doesn't appear after 60 seconds, report the error`;
+- If content doesn't appear after 180 seconds, report the error`;
 
   try {
     let result: any = null;
