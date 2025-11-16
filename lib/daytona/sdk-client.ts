@@ -110,7 +110,13 @@ export async function createWorkspaceViaSDK(
 
       // Set environment variables in the session
       // Note: envVars are already set at workspace creation, but we ensure they're available in the session
-      const envExports = Object.entries(envVars)
+      // Also add WORKSPACE_ID which is only available after workspace creation
+      const sessionEnvVars = {
+        ...envVars,
+        WORKSPACE_ID: sandbox.id,
+      };
+      
+      const envExports = Object.entries(sessionEnvVars)
         .map(([key, value]) => `export ${key}="${value}"`)
         .join(" && ");
 
