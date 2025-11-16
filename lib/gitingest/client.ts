@@ -1,8 +1,8 @@
 /**
  * Git Ingest Client
  * 
- * Uses GitIngest to generate codebase digests.
- * Falls back to URL hack approach when Python is not available (e.g., in Vercel serverless).
+ * Uses Browser Use Cloud for production (Vercel) and Python for local development.
+ * Browser Use Cloud automates the GitIngest.com web interface to extract digest content.
  */
 
 import { exec } from "child_process";
@@ -20,116 +20,271 @@ const PYTHON_SCRIPT_PATH = path.join(
   "automation.py"
 );
 
-/**
- * Convert GitHub URL to GitIngest URL (URL hack approach)
- * Example: https://github.com/owner/repo -> https://gitingest.com/owner/repo
- */
-function convertToGitIngestUrl(githubUrl: string): string {
-  return githubUrl.replace(/github\.com/g, "gitingest.com");
-}
+const BROWSER_USE_API_URL = "https://api.browser-use.com/api/v2";
+const PROCESSING_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Fetch digest from GitIngest using URL hack approach
- * This works by replacing github.com with gitingest.com in the URL
+ * Process a repository through GitIngest using Browser Use Cloud API
+ * This automates the GitIngest.com web interface to extract digest content
  */
-async function fetchFromGitIngestUrl(repoUrl: string): Promise<string> {
-  const gitingestUrl = convertToGitIngestUrl(repoUrl);
-  
+async function processWithBrowserUseCloud(repoUrl: string): Promise<string> {
+  const apiKey = process.env.BROWSER_USE_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "BROWSER_USE_API_KEY environment variable is required for Browser Use Cloud"
+    );
+  }
+
+  // Task description for the browser agent
+  const task = `Navigate to https://gitingest.com/ and process the repository ${repoUrl}.
+
+Steps:
+1. Go to https://gitingest.com/
+2. Find the input field for the repository URL (it may be a text input or textarea)
+3. Enter or paste the repository URL: ${repoUrl}
+4. Submit the form or click the process/analyze button
+5. Wait for the processing to complete (this may take 30-60 seconds for large repos)
+   - Look for indicators like "Processing...", "Analyzing...", or progress bars
+   - Wait until you see the results or a download button appears
+6. Once processing is complete, look for the digest content on the page
+   - The content may be displayed directly on the page in a textarea or pre tag
+   - Or there may be a download button/link to get the file
+7. If content is on the page, copy all the text content from the textarea/pre element
+8. If there's a download button, click it and wait for the download, then read the file
+9. Return the FULL, COMPLETE content as text - do not summarize or truncate
+
+Important:
+- Wait patiently for processing to complete - this can take time
+- The digest content should be substantial (thousands of lines for most repos)
+- Return the complete, unmodified content
+- Look for elements with IDs like "result-summary", "directory-structure", or similar
+- Make sure to get ALL the content, not just a preview`;
+
   try {
-    const response = await fetch(gitingestUrl, {
+    // Create task via Browser Use Cloud API
+    const createResponse = await fetch(`${BROWSER_USE_API_URL}/tasks`, {
+      method: "POST",
       headers: {
-        "User-Agent": "PithyJaunt/1.0",
-        "Accept": "text/plain, text/*, */*",
+        "Content-Type": "application/json",
+        "X-Browser-Use-API-Key": apiKey,
       },
+      body: JSON.stringify({
+        task: task,
+      }),
     });
 
-    if (!response.ok) {
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text();
       throw new Error(
-        `GitIngest URL fetch failed: ${response.status} ${response.statusText}`
+        `Browser Use API error (${createResponse.status}): ${errorText}`
       );
     }
 
-    const content = await response.text();
-    
+    const taskData = await createResponse.json();
+    const taskId = taskData.id;
+
+    if (!taskId) {
+      throw new Error("Failed to get task ID from Browser Use API response");
+    }
+
+    // Poll for task completion
+    const startTime = Date.now();
+    let result: any = null;
+
+    while (Date.now() - startTime < PROCESSING_TIMEOUT) {
+      // Wait before polling
+      await new Promise((resolve) => setTimeout(resolve, 3000)); // Poll every 3 seconds
+
+      const statusResponse = await fetch(
+        `${BROWSER_USE_API_URL}/tasks/${taskId}`,
+        {
+          headers: {
+            "X-Browser-Use-API-Key": apiKey,
+          },
+        }
+      );
+
+      if (!statusResponse.ok) {
+        throw new Error(
+          `Failed to check task status: ${statusResponse.statusText}`
+        );
+      }
+
+      result = await statusResponse.json();
+
+      // Check if task is complete
+      // Status values: "created", "started", "finished", "stopped"
+      if (result.status === "finished") {
+        break;
+      }
+
+      if (result.status === "stopped") {
+        throw new Error(
+          result.error || result.message || "Git ingest processing was stopped"
+        );
+      }
+
+      // Continue polling if still running (created or started)
+    }
+
+    if (!result || result.status !== "finished") {
+      throw new Error("Git ingest processing timed out after 5 minutes");
+    }
+
+    // Extract content from the result
+    // The output field contains the final result
+    let content = "";
+
+    if (result.output) {
+      content = typeof result.output === "string" 
+        ? result.output 
+        : JSON.stringify(result.output);
+    } else if (result.steps && Array.isArray(result.steps)) {
+      // Look through steps for substantial content
+      // The agent should have extracted the digest content
+      for (const step of result.steps.reverse()) {
+        if (step.memory && typeof step.memory === "string" && step.memory.length > 2000) {
+          // Check if it looks like git ingest content
+          if (
+            /Repository:|Files analyzed:|Directory structure:|FILE:|================================================/.test(
+              step.memory
+            )
+          ) {
+            content = step.memory;
+            break;
+          }
+        }
+      }
+    }
+
     if (!content || content.length < 100) {
-      throw new Error("GitIngest returned empty or insufficient content");
+      throw new Error(
+        "Git ingest processing completed but no substantial content was returned. " +
+        "The agent may not have successfully extracted the digest content."
+      );
     }
 
     return content;
   } catch (error: any) {
     throw new Error(
-      `Failed to fetch from GitIngest URL: ${error.message || String(error)}`
+      `Browser Use Cloud processing failed: ${error.message || String(error)}`
     );
   }
 }
 
 /**
- * Process a repository through GitIngest using NPM package
+ * Process a repository through GitIngest using Python package
+ * This works locally but not in Vercel serverless functions
  */
-async function processWithNpmPackage(repoUrl: string): Promise<string> {
-  const gitingest = await getGitingestNpm();
-  if (!gitingest) {
-    throw new Error("NPM package not available");
-  }
-
+async function processWithPython(repoUrl: string): Promise<string> {
+  const fs = await import("fs/promises");
   try {
-    // Use the NPM package's ingest function
-    // The package may export ingest directly or as a default export
-    const ingestFn = gitingest.ingest || gitingest.default?.ingest || gitingest;
-    
-    if (typeof ingestFn !== "function") {
-      throw new Error("NPM package does not export an ingest function");
-    }
-
-    const result = await ingestFn(repoUrl);
-    
-    // The result should be an object with summary, tree, and content
-    // Combine them as per GitIngest documentation
-    if (typeof result === "string") {
-      return result;
-    }
-    
-    if (result && typeof result === "object") {
-      const summary = result.summary || "";
-      const tree = result.tree || "";
-      const content = result.content || "";
-      return `${summary}\n\n${tree}\n\n${content}`;
-    }
-    
-    throw new Error("Unexpected result format from NPM package");
-  } catch (error: any) {
-    throw new Error(`NPM package failed: ${error.message || String(error)}`);
+    await fs.access(PYTHON_SCRIPT_PATH);
+  } catch (error) {
+    throw new Error(
+      `Git ingest automation script not found at ${PYTHON_SCRIPT_PATH}. Make sure the script is installed.`
+    );
   }
+
+  // Execute Python script using the gitingest package
+  const command = `python3 "${PYTHON_SCRIPT_PATH}" --repo-url "${repoUrl}"`;
+  
+  const { stdout, stderr } = await Promise.race([
+    execAsync(command, {
+      maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large repositories
+      timeout: SCRIPT_TIMEOUT,
+      env: {
+        ...process.env,
+        // Pass GitHub token if available (for private repos)
+        ...(process.env.GITHUB_TOKEN && {
+          GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+        }),
+      },
+    }),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Git ingest processing timed out after 5 minutes")),
+        SCRIPT_TIMEOUT
+      )
+    ),
+  ]);
+
+  // Parse JSON output
+  let result: GitIngestResult;
+  try {
+    result = JSON.parse(stdout.trim());
+  } catch (parseError) {
+    // If stdout is not JSON, check stderr
+    if (stderr) {
+      try {
+        result = JSON.parse(stderr.trim());
+      } catch {
+        throw new Error(
+          `Failed to parse git ingest result. stdout: ${stdout.substring(0, 200)}, stderr: ${stderr.substring(0, 200)}`
+        );
+      }
+    } else {
+      throw new Error(
+        `Failed to parse git ingest result. Output: ${stdout.substring(0, 200)}`
+      );
+    }
+  }
+
+  if (!result.success) {
+    throw new Error(result.error || "Git ingest processing failed");
+  }
+
+  if (!result.content) {
+    throw new Error("Git ingest processing succeeded but no content was returned");
+  }
+
+  return result.content;
 }
 
 /**
  * Process a repository through GitIngest
- * Tries NPM package first (works in Vercel), falls back to Python if available
+ * Uses Browser Use Cloud for production, Python for local development
  * 
  * @param repoUrl - The GitHub repository URL
- * @param useCloud - Not used (kept for API compatibility)
+ * @param useCloud - Whether to prefer Browser Use Cloud (default: true for production)
  * @returns The git ingest digest content
  */
 export async function processGitIngest(
   repoUrl: string,
   useCloud: boolean = true
 ): Promise<string> {
-  // First, try NPM package (works in Vercel/serverless)
-  try {
-    return await processWithNpmPackage(repoUrl);
-  } catch (error: any) {
-    // If NPM package is not available or fails, fall through to Python
-    if (!error.message.includes("not available")) {
-      console.log(
-        "NPM package failed, falling back to Python:",
-        error.message
-      );
+  // Determine which method to use based on environment and useCloud flag
+  const isProduction = process.env.NODE_ENV === "production";
+  const hasBrowserUseKey = !!process.env.BROWSER_USE_API_KEY;
+  const shouldUseBrowserUse = useCloud && (isProduction || hasBrowserUseKey);
+
+  if (shouldUseBrowserUse) {
+    // Use Browser Use Cloud for production or when explicitly requested
+    try {
+      return await processWithBrowserUseCloud(repoUrl);
+    } catch (error: any) {
+      console.log("Browser Use Cloud failed, falling back to Python:", error.message);
+      // Fall through to Python for local development
     }
-    // Fall through to Python approach
   }
 
-  // Fall back to Python approach (for local development or environments with Python)
+  // Fall back to Python approach (works locally, not in Vercel)
   try {
+    return await processWithPython(repoUrl);
+  } catch (error: any) {
+    // If Python fails and we're in production, try Browser Use Cloud as last resort
+    if (isProduction && !shouldUseBrowserUse) {
+      try {
+        return await processWithBrowserUseCloud(repoUrl);
+      } catch (browserError: any) {
+        throw new Error(
+          `All git ingest methods failed. Python: ${error.message}, Browser Use: ${browserError.message}`
+        );
+      }
+    }
+    
+    throw error;
+  }
     const fs = await import("fs/promises");
     try {
       await fs.access(PYTHON_SCRIPT_PATH);
