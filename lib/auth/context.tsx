@@ -30,14 +30,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const supabase = createClient();
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
+    // Get initial authenticated user - getUser() verifies with Supabase Auth server
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      // For client-side, we still need session for some features
+      // So we get the session after verifying the user
+      if (user) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          setSession(session);
+          setUser(user);
+          setIsLoading(false);
+        });
+      } else {
+        setSession(null);
+        setUser(null);
+        setIsLoading(false);
+      }
     });
 
     // Listen for auth changes
+    // Note: onAuthStateChange provides session which is fine for reactivity
+    // The initial getUser() ensures we start with verified user data
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {

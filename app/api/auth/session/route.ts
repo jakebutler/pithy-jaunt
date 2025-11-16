@@ -9,11 +9,11 @@ export async function GET() {
   try {
     const supabase = await createClient();
     
-    // Get current session
+    // Get authenticated user - getUser() verifies with Supabase Auth server
     const {
-      data: { session },
+      data: { user },
       error,
-    } = await supabase.auth.getSession();
+    } = await supabase.auth.getUser();
 
     if (error) {
       return NextResponse.json(
@@ -22,7 +22,7 @@ export async function GET() {
       );
     }
 
-    if (!session) {
+    if (!user) {
       return NextResponse.json(
         { error: "No active session" },
         { status: 401 }
@@ -30,11 +30,12 @@ export async function GET() {
     }
 
     // Return user data
+    // Note: expiresAt is not available from getUser(), only from getSession()
+    // If you need expiresAt, you can call getSession() after verifying with getUser()
     return NextResponse.json(
       {
-        userId: session.user.id,
-        email: session.user.email,
-        expiresAt: session.expires_at,
+        userId: user.id,
+        email: user.email,
       },
       { status: 200 }
     );

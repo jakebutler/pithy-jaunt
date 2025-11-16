@@ -9,17 +9,17 @@ export default async function TasksPage() {
   const supabase = await createClient();
   
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     redirect("/login");
   }
 
   // Get user from Convex
   const convexUser = await convexClient.query(
     api.users.getUserBySupabaseId,
-    { supabaseUserId: session.user.id }
+    { supabaseUserId: user.id }
   );
 
   if (!convexUser) {

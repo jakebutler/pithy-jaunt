@@ -16,17 +16,17 @@ export default async function CreateTaskPage({
   const supabase = await createClient();
   
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     redirect("/login");
   }
 
   // Get user from Convex
   const convexUser = await convexClient.query(
     api.users.getUserBySupabaseId,
-    { supabaseUserId: session.user.id }
+    { supabaseUserId: user.id }
   );
 
   if (!convexUser) {
@@ -77,7 +77,7 @@ export default async function CreateTaskPage({
               >
                 Cancel
               </Link>
-              <span className="text-sm text-gray-700">{session.user.email}</span>
+              <span className="text-sm text-gray-700">{user.email}</span>
               <form action="/api/auth/logout" method="POST">
                 <button
                   type="submit"

@@ -55,10 +55,10 @@ export async function middleware(request: NextRequest) {
       },
     });
 
-    // Refresh session if expired - required for Server Components
+    // Verify user authentication - getUser() authenticates with Supabase Auth server
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+    } = await supabase.auth.getUser();
 
     // Protected routes that require authentication
     const protectedRoutes = ["/dashboard", "/repos", "/tasks", "/settings"];
@@ -66,8 +66,8 @@ export async function middleware(request: NextRequest) {
       request.nextUrl.pathname.startsWith(route)
     );
 
-    // Redirect to login if accessing protected route without session
-    if (isProtectedRoute && !session) {
+    // Redirect to login if accessing protected route without authenticated user
+    if (isProtectedRoute && !user) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("returnTo", request.nextUrl.pathname);
       return NextResponse.redirect(loginUrl);
@@ -79,7 +79,7 @@ export async function middleware(request: NextRequest) {
       request.nextUrl.pathname.startsWith(route)
     );
 
-    if (isAuthRoute && session) {
+    if (isAuthRoute && user) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 

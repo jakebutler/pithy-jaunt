@@ -15,17 +15,17 @@ export async function GET(request: Request) {
     // Get authenticated user
     const supabase = await createClient();
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get user from Convex
     const convexUser = await convexClient.query(
       api.users.getUserBySupabaseId,
-      { supabaseUserId: session.user.id }
+      { supabaseUserId: user.id }
     );
 
     if (!convexUser) {

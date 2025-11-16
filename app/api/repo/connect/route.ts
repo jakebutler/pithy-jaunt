@@ -22,17 +22,17 @@ export async function POST(request: Request) {
     // Get authenticated user
     const supabase = await createClient();
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get user from Convex
     const convexUser = await convexClient.query(
       api.users.getUserBySupabaseId,
-      { supabaseUserId: session.user.id }
+      { supabaseUserId: user.id }
     );
 
     if (!convexUser) {
@@ -141,12 +141,12 @@ export async function POST(request: Request) {
     }
 
     // Send email notification if CodeRabbit is not installed
-    if (!coderabbitDetected && session.user.email) {
+    if (!coderabbitDetected && user.email) {
       // Send email asynchronously - don't block the response
       sendCodeRabbitNotInstalledEmail({
-        to: session.user.email,
+        to: user.email,
         repoName: metadata.name,
-        userName: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
+        userName: user.user_metadata?.name || user.user_metadata?.full_name,
       }).catch((error) => {
         // Log error but don't fail the repository connection
         console.error("Failed to send CodeRabbit email notification:", error);
