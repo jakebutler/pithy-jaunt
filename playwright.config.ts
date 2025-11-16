@@ -38,7 +38,7 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
+    timeout: 180 * 1000, // Increased timeout to 3 minutes
     env: process.env.CI ? {} : {
       // Load .env.test for local testing (Next.js will automatically load it when NODE_ENV=test)
       // In CI, environment variables are set in the workflow file

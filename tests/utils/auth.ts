@@ -11,13 +11,14 @@ export interface TestUser {
 
 /**
  * Generate a unique test user email
- * Uses a configurable domain from env or defaults to example.com
+ * Uses a configurable domain from env or defaults to mailinator.com (accepts any email)
  */
 export function generateTestUserEmail(prefix = 'test-user'): string {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 8);
-  // Use TEST_EMAIL_DOMAIN from env, or default to example.com (more likely to be accepted)
-  const domain = process.env.TEST_EMAIL_DOMAIN || 'example.com';
+  // Use TEST_EMAIL_DOMAIN from env, or default to mailinator.com (accepts any email for testing)
+  // Alternative: use a real domain like gmail.com if you have access
+  const domain = process.env.TEST_EMAIL_DOMAIN || 'mailinator.com';
   return `${prefix}-${timestamp}-${random}@${domain}`;
 }
 
