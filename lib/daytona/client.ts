@@ -49,10 +49,18 @@ export async function createWorkspace(params: {
     }
     
     try {
-      return await createWorkspaceViaSDK(params);
+      const result = await createWorkspaceViaSDK(params);
+      console.log("[Daytona] SDK successfully created workspace:", result.workspaceId);
+      return result;
     } catch (error: any) {
-      console.warn("[Daytona] SDK failed, falling back to REST API:", error.message);
-      // Fall through to REST API
+      console.error("[Daytona] SDK failed:", error.message);
+      console.error("[Daytona] Error details:", {
+        name: error.name,
+        stack: error.stack,
+      });
+      // Don't fall through to REST API if SDK fails - throw the error instead
+      // This prevents creating duplicate workspaces
+      throw new Error(`SDK failed to create workspace: ${error.message}`);
     }
   }
 
