@@ -15,6 +15,8 @@ if (!apiKey) {
   console.error("❌ BROWSER_USE_API_KEY not found");
   process.exit(1);
 }
+// TypeScript doesn't narrow after process.exit, so we assert the type
+const apiKeyString: string = apiKey;
 
 const TEST_REPO = "https://github.com/jakebutler/pithy-jaunt";
 
@@ -40,7 +42,7 @@ async function debugAPI() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Browser-Use-API-Key": apiKey,
+        "X-Browser-Use-API-Key": apiKeyString,
       },
       body: JSON.stringify({ task }),
     });
@@ -77,7 +79,7 @@ async function debugAPI() {
         `https://api.browser-use.com/api/v2/tasks/${taskId}`,
         {
           headers: {
-            "X-Browser-Use-API-Key": apiKey,
+            "X-Browser-Use-API-Key": apiKeyString,
           },
         }
       );
