@@ -178,13 +178,48 @@ fi
 echo "[pj] Patch generated successfully"
 echo "[pj] Patch size: $(wc -l < /tmp/patch.diff) lines"
 
-# Apply patch
-echo "[pj] Applying patch..."
-if ! git apply /tmp/patch.diff; then
-  handle_error "Failed to apply patch. The patch may be invalid or conflict with existing code."
-fi
+# Show first few lines of patch for debugging
+echo "[pj] Patch preview (first 20 lines):"
+head -20 /tmp/patch.diff || true
 
-echo "[pj] Patch applied successfully"
+# Apply patch with verbose output
+echo "[pj] Applying patch..."
+set +e
+GIT_APPLY_OUTPUT=$(git apply --verbose /tmp/patch.diff 2>&1)
+GIT_APPLY_EXIT_CODE=$?
+set -e
+
+if [ $GIT_APPLY_EXIT_CODE -ne 0 ]; then
+  echo "[pj] Patch application failed with exit code: $GIT_APPLY_EXIT_CODE"
+  echo "[pj] Git apply output:"
+  echo "$GIT_APPLY_OUTPUT"
+  
+  # Try to get more details about the failure
+  echo "[pj] Attempting to check patch format..."
+  git apply --check --verbose /tmp/patch.diff 2>&1 || true
+  
+  # Show patch file location and size
+  echo "[pj] Patch file location: /tmp/patch.diff"
+  echo "[pj] Patch file size: $(wc -c < /tmp/patch.diff) bytes"
+  
+  # Try applying with --3way to handle conflicts
+  echo "[pj] Attempting to apply patch with --3way (conflict resolution)..."
+  set +e
+  GIT_APPLY_3WAY_OUTPUT=$(git apply --3way --verbose /tmp/patch.diff 2>&1)
+  GIT_APPLY_3WAY_EXIT_CODE=$?
+  set -e
+  
+  if [ $GIT_APPLY_3WAY_EXIT_CODE -ne 0 ]; then
+    echo "[pj] Patch application with --3way also failed"
+    echo "[pj] --3way output:"
+    echo "$GIT_APPLY_3WAY_OUTPUT"
+    handle_error "Failed to apply patch. The patch may be invalid or conflict with existing code. Error: $GIT_APPLY_OUTPUT"
+  else
+    echo "[pj] Patch applied successfully with --3way (conflicts resolved)"
+  fi
+else
+  echo "[pj] Patch applied successfully"
+fi
 
 # Commit changes
 git add -A
