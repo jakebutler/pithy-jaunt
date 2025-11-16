@@ -140,6 +140,15 @@ CRITICAL REQUIREMENTS:
           task,
           llm: "gpt-4.1", // Use more capable model for better reliability
         });
+        
+        // Stream progress for debugging
+        console.log("Browser Use task created, streaming progress...");
+        for await (const update of browserTask.stream()) {
+          if (update.status) {
+            console.log(`Status: ${update.status}`);
+          }
+        }
+        
         result = await browserTask.complete();
       } catch (sdkError: any) {
         console.log("SDK failed, falling back to REST API:", sdkError.message);
