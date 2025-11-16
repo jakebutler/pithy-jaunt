@@ -21,7 +21,7 @@ const PYTHON_SCRIPT_PATH = path.join(
 );
 
 const BROWSER_USE_API_URL = "https://api.browser-use.com/api/v2";
-const PROCESSING_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+const PROCESSING_TIMEOUT = 10 * 60 * 1000; // 10 minutes (GitIngest can take a while for large repos)
 
 /**
  * Process a repository through GitIngest using Browser Use Cloud API
@@ -128,29 +128,57 @@ Important:
     }
 
     if (!result || result.status !== "finished") {
-      throw new Error("Git ingest processing timed out after 5 minutes");
+      throw new Error("Git ingest processing timed out after 10 minutes");
     }
 
     // Extract content from the result
     // The output field contains the final result
     let content = "";
 
+    // Try multiple ways to extract the content
     if (result.output) {
       content = typeof result.output === "string" 
         ? result.output 
         : JSON.stringify(result.output);
+    } else if (result.result) {
+      content = typeof result.result === "string"
+        ? result.result
+        : JSON.stringify(result.result);
+    } else if (result.data) {
+      content = typeof result.data === "string"
+        ? result.data
+        : JSON.stringify(result.data);
     } else if (result.steps && Array.isArray(result.steps)) {
       // Look through steps for substantial content
       // The agent should have extracted the digest content
       for (const step of result.steps.reverse()) {
-        if (step.memory && typeof step.memory === "string" && step.memory.length > 2000) {
+        // Check step output/memory/content fields
+        const stepContent = step.output || step.memory || step.content || step.text;
+        if (stepContent && typeof stepContent === "string" && stepContent.length > 2000) {
           // Check if it looks like git ingest content
           if (
             /Repository:|Files analyzed:|Directory structure:|FILE:|================================================/.test(
-              step.memory
+              stepContent
             )
           ) {
-            content = step.memory;
+            content = stepContent;
+            break;
+          }
+        }
+      }
+    } else if (result.history && Array.isArray(result.history)) {
+      // Look through history for content
+      for (const message of result.history.reverse()) {
+        const messageContent = typeof message === "string"
+          ? message
+          : message.content || message.text || message.output || JSON.stringify(message);
+        if (messageContent && typeof messageContent === "string" && messageContent.length > 2000) {
+          if (
+            /Repository:|Files analyzed:|Directory structure:|FILE:|================================================/.test(
+              messageContent
+            )
+          ) {
+            content = messageContent;
             break;
           }
         }
@@ -283,97 +311,6 @@ export async function processGitIngest(
       }
     }
     
-    throw error;
-  }
-    const fs = await import("fs/promises");
-    try {
-      await fs.access(PYTHON_SCRIPT_PATH);
-      
-      // Execute Python script using the gitingest package
-      const command = `python3 "${PYTHON_SCRIPT_PATH}" --repo-url "${repoUrl}"`;
-      
-      const { stdout, stderr } = await Promise.race([
-        execAsync(command, {
-          maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large repositories
-          timeout: SCRIPT_TIMEOUT,
-          env: {
-            ...process.env,
-            // Pass GitHub token if available (for private repos)
-            ...(process.env.GITHUB_TOKEN && {
-              GITHUB_TOKEN: process.env.GITHUB_TOKEN,
-            }),
-          },
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Git ingest processing timed out after 5 minutes")),
-            SCRIPT_TIMEOUT
-          )
-        ),
-      ]);
-
-      // Parse JSON output
-      let result: GitIngestResult;
-      try {
-        result = JSON.parse(stdout.trim());
-      } catch (parseError) {
-        // If stdout is not JSON, check stderr
-        if (stderr) {
-          try {
-            result = JSON.parse(stderr.trim());
-          } catch {
-            throw new Error(
-              `Failed to parse git ingest result. stdout: ${stdout.substring(0, 200)}, stderr: ${stderr.substring(0, 200)}`
-            );
-          }
-        } else {
-          throw new Error(
-            `Failed to parse git ingest result. Output: ${stdout.substring(0, 200)}`
-          );
-        }
-      }
-
-      if (!result.success) {
-        throw new Error(result.error || "Git ingest processing failed");
-      }
-
-      if (!result.content) {
-        throw new Error("Git ingest processing succeeded but no content was returned");
-      }
-
-      return result.content;
-    } catch (fsError) {
-      // Script not found, fall through to URL hack
-      throw new Error("Python script not accessible");
-    }
-  } catch (error: any) {
-    // If Python approach fails (e.g., python3 not found, script error, etc.)
-    // Fall back to URL hack approach
-    if (
-      error.message.includes("command not found") ||
-      error.message.includes("not accessible") ||
-      error.message.includes("ENOENT") ||
-      error.code === "ENOENT"
-    ) {
-      console.log(
-        "Python not available, falling back to GitIngest URL hack approach"
-      );
-      return await fetchFromGitIngestUrl(repoUrl);
-    }
-
-    // For other errors (timeout, parsing, etc.), try URL hack as fallback
-    if (
-      error.code === "ETIMEDOUT" ||
-      error.message.includes("timed out") ||
-      error.message.includes("parse")
-    ) {
-      console.log(
-        "Python approach failed, falling back to GitIngest URL hack approach"
-      );
-      return await fetchFromGitIngestUrl(repoUrl);
-    }
-
-    // Re-throw if it's a different type of error
     throw error;
   }
 }
