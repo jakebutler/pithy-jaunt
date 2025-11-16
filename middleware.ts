@@ -11,12 +11,18 @@ export async function middleware(request: NextRequest) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Missing Supabase environment variables in middleware");
+    const missing = [];
+    if (!supabaseUrl) missing.push("NEXT_PUBLIC_SUPABASE_URL");
+    if (!supabaseAnonKey) missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    
+    console.error(`Missing Supabase environment variables in middleware: ${missing.join(", ")}`);
     // Return a 500 error response for missing env vars
     return new NextResponse(
       JSON.stringify({
         error: "Server configuration error",
         message: "Missing required environment variables",
+        missing: missing,
+        instructions: "Add these variables in Vercel: Settings → Environment Variables → Add New",
       }),
       {
         status: 500,
