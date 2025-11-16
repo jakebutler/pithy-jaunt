@@ -9,10 +9,9 @@
 
 import { Daytona, Image } from "@daytonaio/sdk";
 
-const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "pithy-jaunt-dev";
-// The snapshot name might be the Docker image name, or we might need to use the image directly
-// If snapshot name is "pithy-jaunt-dev", the actual Docker image is likely "butlerjake/pithy-jaunt-daytona:v1.0.0"
-const DAYTONA_IMAGE_NAME = process.env.DAYTONA_IMAGE_NAME || "butlerjake/pithy-jaunt-daytona:v1.0.0";
+const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "butlerjake/pithy-jaunt-daytona:v1.0.2";
+// The snapshot name is the same as the Docker image name
+const DAYTONA_IMAGE_NAME = process.env.DAYTONA_IMAGE_NAME || "butlerjake/pithy-jaunt-daytona:v1.0.2";
 
 interface CreateWorkspaceParams {
   repoUrl: string;

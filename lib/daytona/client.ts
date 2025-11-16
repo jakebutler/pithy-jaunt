@@ -19,7 +19,7 @@
 
 const DAYTONA_API_URL = process.env.DAYTONA_API_URL || "http://localhost:3001";
 const DAYTONA_API_KEY = process.env.DAYTONA_API_KEY;
-const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "pithy-jaunt-dev";
+const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "butlerjake/pithy-jaunt-daytona:v1.0.2";
 const USE_SDK = process.env.DAYTONA_USE_SDK !== "false"; // Default to true, can be disabled
 const USE_CLI_FALLBACK = process.env.DAYTONA_USE_CLI_FALLBACK === "true";
 const USE_GITHUB_ACTIONS = process.env.DAYTONA_USE_GITHUB_ACTIONS === "true";

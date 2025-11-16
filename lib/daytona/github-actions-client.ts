@@ -16,7 +16,7 @@ const GITHUB_API_URL = "https://api.github.com";
 const GITHUB_REPO_OWNER = process.env.GITHUB_REPO_OWNER || "jakebutler";
 const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME || "pithy-jaunt";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "pithy-jaunt-dev";
+const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "butlerjake/pithy-jaunt-daytona:v1.0.2";
 
 interface CreateWorkspaceParams {
   repoUrl: string;

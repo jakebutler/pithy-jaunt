@@ -12,7 +12,7 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
-const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "pithy-jaunt-dev";
+const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "butlerjake/pithy-jaunt-daytona:v1.0.2";
 
 interface CreateWorkspaceParams {
   repoUrl: string;

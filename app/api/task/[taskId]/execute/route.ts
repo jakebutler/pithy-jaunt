@@ -203,7 +203,7 @@ export async function POST(
         api.workspaces.createWorkspace,
         {
           daytonaId: workspace.workspaceId,
-          template: "pithy-jaunt-dev",
+          template: process.env.DAYTONA_SNAPSHOT_NAME || "butlerjake/pithy-jaunt-daytona:v1.0.2",
           assignedTasks: [task._id],
         }
       );
