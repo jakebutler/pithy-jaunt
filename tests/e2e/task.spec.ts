@@ -118,11 +118,14 @@ test.describe('Task Management Smoke Tests', () => {
   });
 
   test('List tasks for authenticated user', async ({ page }) => {
+    // Login first
+    await loginUserInBrowser(page, baseURL, testUser.email, testUser.password);
+    
     // Navigate to tasks page
     await page.goto(`${baseURL}/tasks`);
     await page.waitForTimeout(2000);
     
-    // Verify we're on the tasks page
+    // Verify we're on the tasks page (not redirected to login)
     const currentUrl = page.url();
     expect(currentUrl).toContain('/tasks');
     

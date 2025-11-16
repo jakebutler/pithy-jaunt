@@ -56,6 +56,9 @@ export async function createTestUser(
     throw new Error(`Failed to create test user: ${error.error || response.statusText}`);
   }
 
+  // Wait a moment for user to be fully created and synced
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   return { email: testEmail, password: testPassword };
 }
 
@@ -93,9 +96,25 @@ export async function loginUserInBrowser(
   await page.goto(`${baseURL}/login`);
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', password);
-  await page.click('button[type="submit"]');
-  // Wait for navigation after login
-  await page.waitForURL(/\/dashboard|\/repos/, { timeout: 5000 });
+  
+  // Click submit button and wait for navigation
+  await Promise.all([
+    page.waitForURL(/\/dashboard|\/repos/, { timeout: 15000 }),
+    page.click('button[type="submit"]'),
+  ]);
+  
+  // Wait a moment for session to be fully established
+  await page.waitForTimeout(1000);
+  
+  // Verify we're actually on dashboard/repos
+  const currentUrl = page.url();
+  if (!currentUrl.includes('/dashboard') && !currentUrl.includes('/repos')) {
+    const bodyText = await page.textContent('body') || '';
+    if (bodyText.toLowerCase().includes('error') || bodyText.toLowerCase().includes('invalid')) {
+      throw new Error('Login failed - error message displayed on page');
+    }
+    throw new Error(`Login did not redirect. Current URL: ${currentUrl}`);
+  }
 }
 
 /**
