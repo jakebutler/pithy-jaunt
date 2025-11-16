@@ -84,26 +84,25 @@ BOUNDARIES:
 
 SPECIFIC INSTRUCTIONS:
 1. Navigate to ${gitingestUrl}
-2. WAIT for the page to fully load (5-15 seconds) - the page uses JavaScript and may take time to render
-3. Verify the page has loaded by checking for:
-   - A "Summary" section with textarea containing repository information
-   - A "Copy all" button (usually in the Summary section, may have a clipboard icon)
-   - If the page appears empty or shows "Processing...", wait longer (up to 30 seconds)
-4. Locate and click the "Copy all" button:
-   - This button is typically in the Summary section
-   - It may be labeled "Copy all" or have a clipboard icon
-   - Click this button to copy all digest content to clipboard
-5. Extract the digest content from the page:
-   - After clicking "Copy all", the content should be in the clipboard
-   - Also extract directly from the page: find all textarea elements and get their values
-   - Look for textareas in the "Summary", "Directory Structure", and "Files Content" sections
-   - Combine all textarea content in order: Summary + Directory Structure + Files Content
-6. Verify the content:
+2. WAIT for the page to fully load (10-30 seconds) - the page uses JavaScript and may need to process the repository
+3. Check if the page is processing:
+   - If you see "Processing..." or loading indicators, wait for them to complete (up to 60 seconds total)
+   - The page may redirect or show a form if the repository hasn't been processed yet
+4. Once the page has loaded, use JavaScript to extract content:
+   - Execute: const textareas = Array.from(document.querySelectorAll('textarea'));
+   - Get the value from each textarea: textareas.map(ta => ta.value)
+   - Look for textareas that contain substantial content (1000+ characters)
+   - The textareas should be in sections labeled "Summary", "Directory Structure", and "Files Content"
+5. Combine all textarea content:
+   - Join all textarea values with newlines: textareas.map(ta => ta.value).join('\\n\\n')
+   - The combined content should be substantial (10,000+ characters)
+6. If "Copy all" button is visible, click it (optional - JavaScript extraction should work)
+7. Verify the extracted content:
    - Content should start with "Repository: [owner]/[repo]"
    - Should contain "Directory structure:" section
    - Should contain "FILE:" markers for individual files
    - Total length should be 10,000+ characters (thousands of lines)
-7. Return the complete, unmodified text content
+8. Return the complete, unmodified text content from the JavaScript extraction
 
 EXPECTED DATA FORMAT:
 - Content starts with: "Repository: [owner]/[repo]"
