@@ -33,8 +33,32 @@ try {
 }
 
 /**
+ * Convert GitHub URL to GitIngest URL using the URL hack
+ * Example: https://github.com/jakebutler/pithy-jaunt -> https://gitingest.com/jakebutler/pithy-jaunt
+ */
+function convertToGitIngestUrl(repoUrl: string): string {
+  try {
+    const url = new URL(repoUrl);
+    // Replace "github.com" with "gitingest.com" (or "hub" with "ingest" in the hostname)
+    const newHostname = url.hostname.replace("github.com", "gitingest.com");
+    // Remove "github.com" from path if present, keep only owner/repo
+    let path = url.pathname;
+    if (path.startsWith("/")) {
+      path = path.substring(1);
+    }
+    // Remove .git suffix if present
+    if (path.endsWith(".git")) {
+      path = path.substring(0, path.length - 4);
+    }
+    return `https://${newHostname}/${path}`;
+  } catch (error) {
+    throw new Error(`Invalid repository URL: ${repoUrl}`);
+  }
+}
+
+/**
  * Process a repository through GitIngest using Browser Use Cloud API
- * This automates the GitIngest.com web interface to extract digest content
+ * Uses URL hack to navigate directly to the processed result page, then clicks "Copy all"
  */
 async function processWithBrowserUseCloud(repoUrl: string): Promise<string> {
   const apiKey = process.env.BROWSER_USE_API_KEY;
@@ -44,38 +68,42 @@ async function processWithBrowserUseCloud(repoUrl: string): Promise<string> {
     );
   }
 
+  // Convert GitHub URL to GitIngest URL using the hack
+  const gitingestUrl = convertToGitIngestUrl(repoUrl);
+
   // Task description following Browser Use Cloud best practices:
   // - Be specific: exact actions and elements
   // - Set boundaries: single page, specific elements
   // - Include context: data format and expected content
-  const task = `Extract the complete codebase digest text from GitIngest.com for repository: ${repoUrl}
+  const task = `Extract the complete codebase digest from GitIngest.com for repository: ${repoUrl}
 
 BOUNDARIES:
-- Visit ONLY: https://gitingest.com/ (single page)
-- Extract content ONLY from textarea or pre elements on this page
-- Wait maximum 180 seconds for processing
+- Visit ONLY: ${gitingestUrl} (single page - this is the direct URL to the processed digest)
+- Extract content from the page after clicking "Copy all" button
+- Wait maximum 60 seconds for page to load
 
 SPECIFIC INSTRUCTIONS:
-1. Navigate to https://gitingest.com/
-2. WAIT for the page to fully load (5-10 seconds) - the page uses JavaScript and may take time to render
+1. Navigate to ${gitingestUrl}
+2. WAIT for the page to fully load (5-15 seconds) - the page uses JavaScript and may take time to render
 3. Verify the page has loaded by checking for:
-   - A heading containing "Prompt-friendly codebase" or "Gitingest"
-   - A text input field visible on the page
-   - If the page appears empty, wait longer (up to 30 seconds) and refresh if needed
-4. Locate the text input field (textbox with placeholder "https://github.com/..." or similar)
-5. Clear any existing text and enter exactly: ${repoUrl}
-6. Click the "Ingest" button (button element immediately next to the input field, labeled "Ingest")
-7. Wait for processing to complete:
-   - Monitor the page for 60-180 seconds
-   - Look for URL changes, loading indicators, or progress messages
-   - Wait until a textarea or pre element appears with substantial content (10,000+ characters)
-   - The page may show "Processing..." or similar indicators
-8. Extract the digest content:
-   - Find the textarea or pre element containing the digest
-   - Use JavaScript if needed: document.querySelector('textarea')?.value || document.querySelector('pre')?.textContent
-   - Check all textarea and pre elements on the page
-   - Verify content starts with "Repository:" and contains "Directory structure:" and "FILE:"
-9. Return the complete, unmodified text content
+   - A "Summary" section with textarea containing repository information
+   - A "Copy all" button (usually in the Summary section, may have a clipboard icon)
+   - If the page appears empty or shows "Processing...", wait longer (up to 30 seconds)
+4. Locate and click the "Copy all" button:
+   - This button is typically in the Summary section
+   - It may be labeled "Copy all" or have a clipboard icon
+   - Click this button to copy all digest content to clipboard
+5. Extract the digest content from the page:
+   - After clicking "Copy all", the content should be in the clipboard
+   - Also extract directly from the page: find all textarea elements and get their values
+   - Look for textareas in the "Summary", "Directory Structure", and "Files Content" sections
+   - Combine all textarea content in order: Summary + Directory Structure + Files Content
+6. Verify the content:
+   - Content should start with "Repository: [owner]/[repo]"
+   - Should contain "Directory structure:" section
+   - Should contain "FILE:" markers for individual files
+   - Total length should be 10,000+ characters (thousands of lines)
+7. Return the complete, unmodified text content
 
 EXPECTED DATA FORMAT:
 - Content starts with: "Repository: [owner]/[repo]"
@@ -85,11 +113,12 @@ EXPECTED DATA FORMAT:
 - Format: Plain text, no HTML markup
 
 CRITICAL REQUIREMENTS:
-- Wait for initial page load before interacting (GitIngest.com uses JavaScript)
+- Wait for page to fully load before interacting
+- Click "Copy all" button to ensure you get the complete content
+- Extract from all textarea elements on the page and combine them
 - Do NOT summarize, truncate, or modify the content
 - Return the FULL text exactly as displayed
-- If content doesn't appear after 180 seconds, report the error
-- Use JavaScript evaluation if direct element access fails`;
+- If content doesn't appear after 60 seconds, report the error`;
 
   try {
     let result: any = null;
