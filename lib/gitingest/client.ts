@@ -67,6 +67,8 @@ async function processWithBrowserUseCloud(repoUrl: string): Promise<string> {
       "BROWSER_USE_API_KEY environment variable is required for Browser Use Cloud"
     );
   }
+  // TypeScript doesn't narrow after throw, so we assert the type
+  const apiKeyString: string = apiKey;
 
   // Convert GitHub URL to GitIngest URL using the hack
   const gitingestUrl = convertToGitIngestUrl(repoUrl);
@@ -135,7 +137,7 @@ CRITICAL REQUIREMENTS:
     // Try using SDK first if available
     if (BrowserUseClient && typeof BrowserUseClient === "function") {
       try {
-        const client = new BrowserUseClient({ apiKey });
+        const client = new BrowserUseClient({ apiKey: apiKeyString });
         const browserTask = await client.tasks.createTask({ 
           task,
           llm: "gpt-4.1", // Use more capable model for better reliability
@@ -163,7 +165,7 @@ CRITICAL REQUIREMENTS:
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Browser-Use-API-Key": apiKey,
+          "X-Browser-Use-API-Key": apiKeyString,
         },
         body: JSON.stringify({
           task: task,
@@ -196,7 +198,7 @@ CRITICAL REQUIREMENTS:
           `${BROWSER_USE_API_URL}/tasks/${taskId}`,
           {
             headers: {
-              "X-Browser-Use-API-Key": apiKey,
+              "X-Browser-Use-API-Key": apiKeyString,
             },
           }
         );
