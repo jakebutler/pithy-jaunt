@@ -6,20 +6,32 @@ FROM ubuntu:22.04
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies
+# Install system dependencies and Python 3.11
+# Ubuntu 22.04 comes with Python 3.10, so we need to add deadsnakes PPA for Python 3.11
 RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa -y \
+    && apt-get update && apt-get install -y \
     git \
     curl \
     wget \
-    python3 \
-    python3-pip \
-    python3-venv \
+    python3.11 \
+    python3.11-dev \
+    python3.11-venv \
+    python3.11-distutils \
     build-essential \
     ca-certificates \
     gnupg \
     lsb-release \
     jq \
     && rm -rf /var/lib/apt/lists/*
+
+# Install pip for Python 3.11
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
+
+# Set python3.11 as default python3
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
 
 # Install GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
@@ -40,6 +52,10 @@ WORKDIR /app
 # Copy Python requirements and install dependencies
 COPY daytona/requirements.txt /app/requirements.txt
 RUN pip3 install --no-cache-dir -r /app/requirements.txt
+
+# Install Playwright browsers (required for browser-use)
+RUN pip3 install playwright && \
+    playwright install chromium --with-deps
 
 # Copy agent runner and system prompt
 COPY daytona/agent-runner.py /app/agent-runner.py

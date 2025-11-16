@@ -1,10 +1,12 @@
 # Python dependencies for Pithy Jaunt AI Agent Runner
 # Install with: pip install -r requirements.txt
+# Requires Python 3.11 or higher
 
 # LLM Providers
 openai>=1.0.0
 anthropic>=0.18.0
 
-# Browser automation for git ingest (optional - only needed if using browser-use tests)
-# browser-use>=0.9.0  # Commented out - package not available on PyPI, use Browser Use Cloud API instead
+# Browser automation for git ingest
+browser-use>=0.9.0
+playwright>=1.40.0
 
