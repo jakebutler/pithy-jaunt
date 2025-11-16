@@ -92,27 +92,30 @@ SPECIFIC INSTRUCTIONS:
    - If hasContent is true, proceed to step 4
    - If hasContent is false, wait 15 more seconds and check again
 4. Extract content from #result-content textarea:
-   - Execute: document.querySelector('#result-content').value
+   - Execute: const content = document.querySelector('#result-content').value;
+   - Check the length: content.length
+   - If content.length > 1000, this is good content - proceed
    - Store this as the primary content
-   - This should be 10,000+ characters
-5. If #result-content is still empty after 120 seconds, try fallback:
-   a) Check all textareas:
-      - Execute: Array.from(document.querySelectorAll('textarea')).map(ta => ({id: ta.id, length: ta.value.length, value: ta.value}))
-      - Find the textarea with the longest value
-      - Use that textarea's value
-   b) Click "Copy all" button:
-      - Find: document.querySelector('button[onclick*=\"copyFullDigest\"]')
-      - Click it
-      - Wait 2 seconds
-      - Read: navigator.clipboard.readText()
-6. Use content in priority order:
-   - FIRST: #result-content textarea value (if length > 1000)
-   - SECOND: Longest textarea value from all textareas
-   - THIRD: Clipboard content (from "Copy all")
-7. Verify and return:
-   - Content should start with "Repository:"
-   - Should contain "Directory structure:" and "FILE:"
-   - Return the complete, unmodified text (even if shorter than 10,000 chars)
+5. ALWAYS try to click "Copy all" button to get complete content (even if #result-content has content):
+   - Find the button: document.querySelector('button[onclick*=\"copyFullDigest\"]')
+   - Click it
+   - Wait 3 seconds for clipboard to update
+   - Read from clipboard: navigator.clipboard.readText().then(text => text).catch(() => '')
+   - The clipboard may contain the FULL content even if textarea is cropped
+6. If clipboard read fails or is empty, try "Download" button:
+   - Find button with text "Download" or download icon
+   - Click it to trigger download
+   - Wait 5 seconds for download
+   - The downloaded file should contain the full content
+7. Use content in priority order (use the LONGEST available):
+   - FIRST: Clipboard content from "Copy all" (if length > content from textarea)
+   - SECOND: #result-content textarea value (if length > 1000)
+   - THIRD: Downloaded file content (if available)
+   - FOURTH: Longest textarea value from all textareas
+8. Return the content:
+   - Return the LONGEST content available (even if it says "cropped")
+   - Do NOT summarize or truncate - return exactly as extracted
+   - Content should start with "Repository:" and contain "Directory structure:" and "FILE:"
 
 EXPECTED DATA FORMAT:
 - Content starts with: "Repository: [owner]/[repo]"
