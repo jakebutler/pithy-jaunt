@@ -94,6 +94,7 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
 
       // Show success message
       setSuccessMessage("Task execution started successfully!");
+      setIsExecuting(false);
       
       // Refresh the page to show updated status
       router.refresh();
