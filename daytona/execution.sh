@@ -84,6 +84,7 @@ cd /tmp/pj
 
 # Clone repository
 echo "[pj] Cloning repository: $TARGET_REPO"
+send_webhook "task.progress" "running" "" "" || true  # Send progress update (non-blocking)
 if ! git clone "$TARGET_REPO" repo; then
   handle_error "Failed to clone repository: $TARGET_REPO"
 fi

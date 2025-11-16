@@ -90,6 +90,22 @@ export async function POST(request: Request) {
         status: status === "success" ? "completed" : "failed",
       });
 
+      // Store execution log for completion
+      try {
+        const logMessage = status === "success" 
+          ? `Task completed successfully. PR: ${prUrl || "N/A"}`
+          : `Task completed with status: ${status}`;
+        
+        await convexClient.mutation(api.executionLogs.createLog, {
+          taskId: task._id,
+          workspaceId: workspaceId || task.assignedWorkspaceId || "",
+          logs: logMessage,
+          status: status === "success" ? "completed" : "failed",
+        });
+      } catch (logError) {
+        console.warn("[Daytona Webhook] Failed to store completion log:", logError);
+      }
+
       // Update workspace if it exists
       try {
         const workspace = await convexClient.query(
