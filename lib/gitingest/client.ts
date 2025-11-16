@@ -45,30 +45,39 @@ async function processWithBrowserUseCloud(repoUrl: string): Promise<string> {
   }
 
   // Task description for the browser agent
-  // Make it more explicit and actionable
-  const task = `Go to https://gitingest.com/ and generate a digest for the repository: ${repoUrl}
+  // Make it more explicit and actionable based on actual GitIngest.com behavior
+  const task = `Extract the complete codebase digest from GitIngest.com for repository: ${repoUrl}
 
-Your goal is to extract the complete codebase digest text from GitIngest.com.
+CRITICAL: GitIngest.com loads content dynamically via JavaScript. You MUST wait for the content to fully render before extracting.
 
 Step-by-step instructions:
 1. Navigate to https://gitingest.com/
-2. Find the URL input field on the page (it should be visible on the main page)
-3. Enter this exact repository URL: ${repoUrl}
-4. Click the submit/process button (may be labeled "Ingest", "Process", "Generate", or similar)
-5. Wait for processing to complete - you'll see a loading indicator or "Processing..." message
-6. Once processing finishes, the digest content will appear on the page
-7. Find the digest text content - it may be in:
-   - A textarea element (look for id="result-summary" or similar)
-   - A pre or code element showing the formatted digest
-   - Multiple sections showing repository summary, directory structure, and file contents
-8. Extract ALL the text content from these elements
-9. Return the complete, unmodified digest text - it should be thousands of lines long
+2. Find the text input field with placeholder "https://github.com/..." (it's a textbox element)
+3. Clear the field and enter this exact URL: ${repoUrl}
+4. Click the "Ingest" button (it's a button element next to the input)
+5. IMPORTANT: Wait for the page to process. You'll see:
+   - The page may show a loading state or spinner
+   - The URL may change to show the repository path
+   - Content will appear below the form
+6. Wait AT LEAST 60-90 seconds for processing to complete (large repos take time)
+7. Once content appears, look for:
+   - A large textarea or pre element containing the digest
+   - The content should be visible on the page (not hidden)
+   - It may be in a scrollable container
+8. Use JavaScript to extract the content if needed:
+   - Execute: document.querySelector('textarea')?.value or document.querySelector('pre')?.textContent
+   - Check all textarea and pre elements on the page
+   - Look for content that starts with "Repository:" and contains "Directory structure:"
+9. If content is not visible, wait longer and check again - GitIngest can take 2-3 minutes for large repos
+10. Extract ALL text content - it should be thousands of lines (10,000+ characters minimum)
 
 Critical requirements:
-- Do NOT summarize or truncate the content
-- Return the FULL digest including repository summary, directory structure, and all file contents
-- The content should start with "Repository:" and contain "Directory structure:" and "FILE:" markers
-- Wait for processing to fully complete before extracting content`;
+- Wait patiently - GitIngest processing can take 60-180 seconds
+- Do NOT give up if content doesn't appear immediately
+- Use JavaScript evaluation to extract from textarea/pre elements if direct extraction fails
+- Return the COMPLETE, UNMODIFIED digest text - do NOT summarize
+- The content must include "Repository:", "Directory structure:", and "FILE:" sections
+- If the page shows an error or times out, report the error but keep trying`;
 
   try {
     let result: any = null;
