@@ -75,9 +75,25 @@ git config --global user.name "Pithy Jaunt Bot"
 git config --global user.email "bot@pithy-jaunt.dev"
 
 # Configure GitHub CLI if token is provided
+# Use explicit error handling to prevent script from exiting on failure
 if [ -n "${GITHUB_TOKEN:-}" ]; then
-  echo "$GITHUB_TOKEN" | gh auth login --with-token
-  echo "[pj] GitHub CLI authenticated"
+  if command -v gh &> /dev/null; then
+    # Temporarily disable exit on error for this command
+    set +e
+    echo "$GITHUB_TOKEN" | gh auth login --with-token 2>&1
+    gh_auth_status=$?
+    set -e
+    
+    if [ $gh_auth_status -eq 0 ]; then
+      echo "[pj] GitHub CLI authenticated"
+    else
+      echo "[pj] Warning: GitHub CLI authentication failed (exit code: $gh_auth_status), but continuing anyway"
+      echo "[pj] PR creation may fail later if GitHub CLI is required"
+    fi
+  else
+    echo "[pj] Warning: GitHub CLI (gh) not found, but continuing anyway"
+    echo "[pj] PR creation may fail later if GitHub CLI is required"
+  fi
 fi
 
 # Create working directory
