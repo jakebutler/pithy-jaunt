@@ -348,6 +348,84 @@ export async function terminateWorkspace(workspaceId: string): Promise<void> {
 }
 
 /**
+ * List all workspaces
+ */
+export async function listWorkspaces(): Promise<Array<{
+  workspaceId: string;
+  name?: string;
+  status: "creating" | "running" | "stopped" | "terminated";
+  createdAt?: number;
+}>> {
+  if (!DAYTONA_API_KEY) {
+    throw new Error("DAYTONA_API_KEY environment variable is required");
+  }
+
+  const response = await fetch(`${DAYTONA_API_URL}/workspace`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${DAYTONA_API_KEY}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Daytona API error: ${response.status} ${response.statusText} - ${errorText}`
+    );
+  }
+
+  const data = await response.json();
+  
+  // Handle both array and object responses
+  const workspaces = Array.isArray(data) ? data : (data.workspaces || []);
+  
+  return workspaces.map((ws: any) => {
+    const daytonaStatus = ws.status || ws.state || "unknown";
+    let mappedStatus: "creating" | "running" | "stopped" | "terminated" = "running";
+    
+    if (daytonaStatus === "started" || daytonaStatus === "Started") {
+      mappedStatus = "running";
+    } else if (daytonaStatus === "stopped" || daytonaStatus === "Stopped") {
+      mappedStatus = "stopped";
+    } else if (daytonaStatus === "terminated" || daytonaStatus === "Terminated") {
+      mappedStatus = "terminated";
+    } else if (daytonaStatus === "creating" || daytonaStatus === "Creating") {
+      mappedStatus = "creating";
+    }
+    
+    return {
+      workspaceId: ws.workspaceId || ws.id || ws.name,
+      name: ws.name,
+      status: mappedStatus,
+      createdAt: ws.createdAt ? new Date(ws.createdAt).getTime() : undefined,
+    };
+  });
+}
+
+/**
+ * Stop a workspace (without terminating it)
+ */
+export async function stopWorkspace(workspaceId: string): Promise<void> {
+  if (!DAYTONA_API_KEY) {
+    throw new Error("DAYTONA_API_KEY environment variable is required");
+  }
+
+  const response = await fetch(`${DAYTONA_API_URL}/workspace/${workspaceId}/stop`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${DAYTONA_API_KEY}`,
+    },
+  });
+
+  if (!response.ok && response.status !== 404) {
+    const errorText = await response.text();
+    throw new Error(
+      `Daytona API error: ${response.status} ${response.statusText} - ${errorText}`
+    );
+  }
+}
+
+/**
  * Check if Daytona is configured
  */
 export function isDaytonaConfigured(): boolean {

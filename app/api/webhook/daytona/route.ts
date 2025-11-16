@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { cleanupWorkspace } from "@/lib/daytona/maintenance";
 
 /**
  * POST /api/webhook/daytona
@@ -198,6 +199,30 @@ export async function POST(request: Request) {
             workspaceId: workspace._id,
             status: "stopped",
           });
+
+          // Schedule cleanup after grace period
+          // Note: Since we can't easily schedule delayed execution, we check if grace period
+          // has elapsed. If not, the scheduled cleanup job will handle it.
+          // For immediate cleanup, we check if enough time has passed since task completion.
+          const taskAge = Date.now() - task.updatedAt;
+          const gracePeriodMs = status === "success" 
+            ? parseInt(process.env.WORKSPACE_COMPLETION_GRACE_PERIOD_MINUTES || "5") * 60 * 1000
+            : parseInt(process.env.WORKSPACE_FAILED_GRACE_PERIOD_MINUTES || "10") * 60 * 1000;
+
+          if (taskAge >= gracePeriodMs) {
+            // Grace period has elapsed, clean up immediately
+            console.log("[Daytona Webhook] Grace period elapsed, cleaning up workspace immediately");
+            cleanupWorkspace(
+              workspace._id,
+              workspace.daytonaId,
+              status === "success" ? "task_completed" : "task_failed"
+            ).catch((error) => {
+              console.error("[Daytona Webhook] Failed to cleanup workspace:", error);
+              // Non-critical - scheduled job will retry
+            });
+          } else {
+            console.log("[Daytona Webhook] Grace period not elapsed, scheduled cleanup will handle it");
+          }
         }
       } catch (error) {
         // Workspace might not exist, that's okay
@@ -292,6 +317,21 @@ export async function POST(request: Request) {
             workspaceId: workspace._id,
             status: "stopped",
           });
+
+          // Schedule cleanup after grace period (same logic as task.completed)
+          const taskAge = Date.now() - task.updatedAt;
+          const gracePeriodMs = parseInt(process.env.WORKSPACE_FAILED_GRACE_PERIOD_MINUTES || "10") * 60 * 1000;
+
+          if (taskAge >= gracePeriodMs) {
+            console.log("[Daytona Webhook] Grace period elapsed, cleaning up failed workspace immediately");
+            cleanupWorkspace(
+              workspace._id,
+              workspace.daytonaId,
+              "task_failed"
+            ).catch((error) => {
+              console.error("[Daytona Webhook] Failed to cleanup workspace:", error);
+            });
+          }
         }
       } catch (error) {
         console.log("[Daytona Webhook] Workspace not found (non-critical):", error);

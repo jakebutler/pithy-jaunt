@@ -12,7 +12,7 @@ Daytona documentation recommends proactive cleanup using auto-stop, auto-archive
 
 ## What Changes
 
-- Add scheduled maintenance job (hourly) to identify and clean up workspaces
+- Add scheduled maintenance job (once per day, configurable) to identify and clean up workspaces
 - Implement automatic termination of workspaces after task completion
 - Add idle workspace detection and cleanup based on last activity
 - Configure Daytona auto-stop and auto-archive intervals where supported
@@ -30,8 +30,8 @@ Daytona documentation recommends proactive cleanup using auto-stop, auto-archive
   - Modified: `lib/daytona/client.ts` - Add listWorkspaces, stopWorkspace functions
   - Modified: `app/api/webhook/daytona/route.ts` - Trigger cleanup on task completion
   - Modified: `convex/workspaces.ts` - Add queries for cleanup candidates
-  - New: Scheduled job or cron task for periodic cleanup (Vercel Cron or Convex scheduler)
-  - New: Environment variables for cleanup configuration
+  - New: Scheduled job via Vercel Cron for periodic cleanup (default: once per day for Hobby plan)
+  - New: Environment variables for cleanup configuration (including configurable cron schedule)
 
 **BREAKING**: None - this is additive functionality.
 

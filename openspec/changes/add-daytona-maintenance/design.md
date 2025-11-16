@@ -25,13 +25,14 @@ Daytona workspaces are created for task execution and should be cleaned up after
 **Chosen**: Hybrid approach - event-driven for task completion, scheduled for idle cleanup
 
 **Rationale**: 
-- Event-driven cleanup on task completion provides immediate resource recovery
-- Scheduled cleanup catches edge cases (orphaned workspaces, missed events)
+- Event-driven cleanup on task completion provides immediate resource recovery (critical with daily schedule)
+- Scheduled cleanup catches edge cases (orphaned workspaces, missed events, state drift)
 - Simpler than pure event-driven (no need for complex event handling)
+- **Important**: With Vercel Hobby plan (once/day limit), event-driven cleanup is essential
 
 **Alternatives considered**:
-- Pure event-driven: More complex, risk of missed events
-- Pure scheduled: Slower resource recovery, simpler implementation
+- Pure event-driven: More complex, risk of missed events, no safety net
+- Pure scheduled: Too slow resource recovery (daily only), not acceptable for task completion cleanup
 
 ### Decision: Vercel Cron vs Convex Scheduler
 **Chosen**: Vercel Cron for scheduled maintenance
@@ -41,6 +42,7 @@ Daytona workspaces are created for task execution and should be cleaned up after
 - No additional infrastructure needed
 - Works well with Next.js API routes
 - Can be disabled via environment variable
+- **Note**: Hobby plan limits to once per day, so event-driven cleanup is critical
 
 **Alternatives considered**:
 - Convex scheduled functions: Would require Convex-specific patterns, less flexible
@@ -123,10 +125,12 @@ Daytona workspaces are created for task execution and should be cleaned up after
 ### Trade-off: Cleanup Frequency vs Resource Usage
 - More frequent cleanup = lower resource usage but more API calls
 - Less frequent cleanup = fewer API calls but higher resource usage
-- **Chosen**: 60-minute (hourly) interval balances both concerns
-  - Event-driven cleanup handles task completion immediately
+- **Chosen**: Once per day (configurable via cron schedule) due to Vercel Hobby plan limitations
+  - Event-driven cleanup handles task completion immediately (critical with daily schedule)
   - Scheduled cleanup is primarily for idle/orphaned workspaces and reconciliation
-  - Hourly is sufficient given 30-minute idle timeout and 1-hour orphaned timeout
+  - Daily cleanup is acceptable given event-driven cleanup handles most cases
+  - Schedule is configurable via `WORKSPACE_CLEANUP_CRON_SCHEDULE` environment variable
+  - Default: `0 2 * * *` (2:00 AM daily) - can be adjusted for Pro/Enterprise plans
 
 ## Migration Plan
 

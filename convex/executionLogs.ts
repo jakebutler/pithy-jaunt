@@ -124,3 +124,29 @@ export const deleteLogsByTask = mutation({
   },
 });
 
+/**
+ * Delete all execution logs for multiple tasks
+ */
+export const deleteLogsByTasks = mutation({
+  args: {
+    taskIds: v.array(v.id("tasks")),
+  },
+  handler: async (ctx, args) => {
+    let totalDeleted = 0;
+    
+    for (const taskId of args.taskIds) {
+      const logs = await ctx.db
+        .query("executionLogs")
+        .withIndex("by_task", (q) => q.eq("taskId", taskId))
+        .collect();
+
+      for (const log of logs) {
+        await ctx.db.delete(log._id);
+        totalDeleted++;
+      }
+    }
+
+    return { deleted: totalDeleted };
+  },
+});
+

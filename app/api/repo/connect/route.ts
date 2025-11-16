@@ -6,6 +6,8 @@ import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
 import { triggerRepositoryAnalysis } from "@/lib/coderabbit/client";
 import { sendCodeRabbitNotInstalledEmail } from "@/lib/email/sender";
+import { processGitIngestWithRetry } from "@/lib/gitingest/client";
+import { Id } from "@/convex/_generated/dataModel";
 
 /**
  * POST /api/repo/connect
@@ -153,6 +155,13 @@ export async function POST(request: Request) {
       });
     }
 
+    // Trigger git ingest processing asynchronously
+    // Don't block the response - process in background
+    processGitIngestAsync(repoId, metadata.url).catch((error) => {
+      // Log error but don't fail the repository connection
+      console.error("Failed to process git ingest:", error);
+    });
+
     // Return success response
     return NextResponse.json(
       {
@@ -200,6 +209,45 @@ export async function POST(request: Request) {
       { error: "Failed to connect repository" },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Process git ingest asynchronously for a repository
+ * Updates the repository record with git ingest content when complete
+ */
+async function processGitIngestAsync(
+  repoId: Id<"repos">,
+  repoUrl: string
+): Promise<void> {
+  try {
+    // Update status to processing
+    await convexClient.mutation(api.repos.updateGitIngest, {
+      repoId,
+      status: "processing",
+    });
+
+    // Process git ingest with retry
+    // Note: useCloud parameter is kept for compatibility but not used
+    const content = await processGitIngestWithRetry(repoUrl, true, 1);
+
+    // Update repository with git ingest content
+    await convexClient.mutation(api.repos.updateGitIngest, {
+      repoId,
+      status: "completed",
+      content,
+      generatedAt: Date.now(),
+    });
+
+    console.log(`Git ingest completed for repository ${repoId}`);
+  } catch (error: any) {
+    console.error(`Git ingest failed for repository ${repoId}:`, error);
+
+    // Update status to failed
+    await convexClient.mutation(api.repos.updateGitIngest, {
+      repoId,
+      status: "failed",
+    });
   }
 }
 

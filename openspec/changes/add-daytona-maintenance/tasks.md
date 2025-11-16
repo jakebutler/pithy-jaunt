@@ -36,20 +36,23 @@
 - [ ] 6.4 Add cleanup for orphaned workspaces (no assigned tasks)
 
 ## 7. Scheduled Maintenance Job
-- [ ] 7.1 Set up Vercel Cron job or Convex scheduled function
-- [ ] 7.2 Configure cleanup schedule (default: every 60 minutes / hourly)
-- [ ] 7.3 Implement periodic cleanup of idle workspaces
-- [ ] 7.4 Implement periodic state reconciliation
-- [ ] 7.5 Add error handling and retry logic
+- [ ] 7.1 Set up Vercel Cron job (configure in `vercel.json` or Next.js config)
+- [ ] 7.2 Configure cleanup schedule (default: `0 2 * * *` - 2:00 AM daily for Hobby plan)
+- [ ] 7.3 Make schedule configurable via `WORKSPACE_CLEANUP_CRON_SCHEDULE` environment variable
+- [ ] 7.4 Implement periodic cleanup of idle workspaces
+- [ ] 7.5 Implement periodic state reconciliation
+- [ ] 7.6 Add error handling and retry logic
+- [ ] 7.7 Document Vercel plan limitations (Hobby: once/day, Pro: unlimited)
 
 ## 8. Configuration
 - [ ] 8.1 Add environment variables:
   - `WORKSPACE_CLEANUP_ENABLED` (default: true)
-  - `WORKSPACE_CLEANUP_INTERVAL_MINUTES` (default: 60)
+  - `WORKSPACE_CLEANUP_CRON_SCHEDULE` (default: `0 2 * * *` - 2:00 AM daily)
   - `WORKSPACE_IDLE_TIMEOUT_MINUTES` (default: 30)
   - `WORKSPACE_COMPLETION_GRACE_PERIOD_MINUTES` (default: 5)
 - [ ] 8.2 Update `env.example` with new variables
 - [ ] 8.3 Document configuration in README
+- [ ] 8.4 Document Vercel plan limitations and how to adjust schedule for Pro/Enterprise
 
 ## 9. Testing
 - [ ] 9.1 Test cleanup of completed task workspaces

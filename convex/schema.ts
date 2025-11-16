@@ -32,6 +32,16 @@ export default defineSchema({
     ),
     lastAnalyzedAt: v.optional(v.number()),
     coderabbitDetected: v.boolean(),
+    gitIngestContent: v.optional(v.string()), // Git ingest digest content
+    gitIngestStatus: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("processing"),
+        v.literal("completed"),
+        v.literal("failed")
+      )
+    ),
+    gitIngestGeneratedAt: v.optional(v.number()), // Timestamp when generated
     createdAt: v.number(),
   })
     .index("by_user", ["userId"])

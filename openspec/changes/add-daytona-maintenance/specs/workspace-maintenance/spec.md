@@ -46,7 +46,7 @@ The system SHALL periodically reconcile workspace states between Convex and Dayt
 The system SHALL run a scheduled maintenance job to perform cleanup and reconciliation operations.
 
 #### Scenario: Periodic cleanup execution
-- **WHEN** the scheduled maintenance job runs (default: every 60 minutes / hourly)
+- **WHEN** the scheduled maintenance job runs (default: once per day at 2:00 AM)
 - **THEN** the job SHALL identify cleanup candidates
 - **AND** the job SHALL terminate eligible workspaces
 - **AND** the job SHALL reconcile workspace states
@@ -81,10 +81,11 @@ The system SHALL support configurable cleanup policies via environment variables
 - **AND** scheduled maintenance jobs SHALL skip cleanup operations
 - **AND** manual cleanup endpoint SHALL still be available
 
-#### Scenario: Configure cleanup intervals
-- **WHEN** `WORKSPACE_CLEANUP_INTERVAL_MINUTES` is set
-- **THEN** the scheduled maintenance job SHALL run at the specified interval
-- **AND** the default interval SHALL be 60 minutes (hourly) if not specified
+#### Scenario: Configure cleanup schedule
+- **WHEN** `WORKSPACE_CLEANUP_CRON_SCHEDULE` is set
+- **THEN** the scheduled maintenance job SHALL run according to the cron expression
+- **AND** the default schedule SHALL be `0 2 * * *` (2:00 AM daily) if not specified
+- **AND** the cron schedule SHALL be configurable to support different Vercel plan limits
 
 #### Scenario: Configure idle timeout
 - **WHEN** `WORKSPACE_IDLE_TIMEOUT_MINUTES` is set

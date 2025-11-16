@@ -35,6 +35,7 @@ export const createRepo = mutation({
       branch: args.branch,
       analyzerStatus: "pending",
       coderabbitDetected: args.coderabbitDetected,
+      gitIngestStatus: "pending",
       createdAt: now,
     });
   },
@@ -136,6 +137,98 @@ export const getRepoByOwnerAndName = query({
         )
       )
       .first();
+  },
+});
+
+/**
+ * Update git ingest data for a repository
+ */
+export const updateGitIngest = mutation({
+  args: {
+    repoId: v.id("repos"),
+    content: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    generatedAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const repo = await ctx.db.get(args.repoId);
+    if (!repo) {
+      throw new Error("Repository not found");
+    }
+
+    const updateData: {
+      gitIngestStatus: typeof args.status;
+      gitIngestContent?: string;
+      gitIngestGeneratedAt?: number;
+    } = {
+      gitIngestStatus: args.status,
+    };
+
+    if (args.content !== undefined) {
+      updateData.gitIngestContent = args.content;
+    }
+
+    if (args.generatedAt !== undefined) {
+      updateData.gitIngestGeneratedAt = args.generatedAt;
+    } else if (args.status === "completed") {
+      updateData.gitIngestGeneratedAt = Date.now();
+    }
+
+    await ctx.db.patch(args.repoId, updateData);
+  },
+});
+
+/**
+ * Get git ingest data for a repository
+ * Verifies that the user owns the repository
+ */
+export const getGitIngest = query({
+  args: {
+    repoId: v.id("repos"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const repo = await ctx.db.get(args.repoId);
+    if (!repo) {
+      throw new Error("Repository not found");
+    }
+
+    // Verify user owns the repository
+    if (repo.userId !== args.userId) {
+      throw new Error("Unauthorized: User does not own this repository");
+    }
+
+    return {
+      content: repo.gitIngestContent ?? null,
+      status: repo.gitIngestStatus ?? "pending",
+      generatedAt: repo.gitIngestGeneratedAt ?? null,
+    };
+  },
+});
+
+/**
+ * Delete all repositories for a user
+ */
+export const deleteAllReposForUser = mutation({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const repos = await ctx.db
+      .query("repos")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    for (const repo of repos) {
+      await ctx.db.delete(repo._id);
+    }
+
+    return { deleted: repos.length };
   },
 });
 
