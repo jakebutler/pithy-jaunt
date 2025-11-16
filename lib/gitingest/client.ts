@@ -84,33 +84,39 @@ BOUNDARIES:
 
 SPECIFIC INSTRUCTIONS:
 1. Navigate to ${gitingestUrl}
-2. Immediately execute JavaScript to check page state:
-   - Execute: document.readyState (should be "complete" or "interactive")
-   - Execute: document.querySelectorAll('textarea').length (count textareas)
-   - Execute: document.querySelector('button[onclick*=\"copyFullDigest\"]') ? 'found' : 'not found' (check for Copy all button)
-3. WAIT for the page to fully load (15-45 seconds) - the page uses JavaScript and may need to process the repository
-4. Periodically check page state using JavaScript (every 10-15 seconds):
-   - Check if textareas exist: document.querySelectorAll('textarea').length > 0
-   - Check if button exists: document.querySelector('button[onclick*=\"copyFullDigest\"]') !== null
-   - Check page text content: document.body.innerText.includes('Repository:') || document.body.innerText.includes('Processing')
-5. If you see "Processing..." or "Loading..." text, wait patiently (up to 120 seconds total)
-6. Once textareas are detected (document.querySelectorAll('textarea').length > 0), extract content:
-   - Execute: const textareas = Array.from(document.querySelectorAll('textarea'));
-   - Get ALL values: textareas.map(ta => ta.value) (do not filter - get everything)
-   - Combine ALL textarea content: textareas.map(ta => ta.value).join('\\n\\n')
-   - Scroll to bottom of page if needed to ensure all content is loaded
-7. Click the "Copy all" button to get complete content:
-   - Find: document.querySelector('button[onclick*=\"copyFullDigest\"]')
-   - Click it to copy all content to clipboard
-   - Then read from clipboard: navigator.clipboard.readText()
-8. If there's a "Download" button, click it to get the full file (optional)
-9. Use the clipboard content if available (from "Copy all"), otherwise use textarea extraction
-9. Verify the extracted content:
+2. WAIT for the page to fully load (15-45 seconds) - the page uses JavaScript and may need to process the repository
+3. Check if the page is processing:
+   - If you see "Processing..." or "Loading..." text, wait patiently (up to 120 seconds total)
+   - The page may show a form with the repository URL pre-filled - this is normal, wait for processing
+4. Once the page has loaded, locate the main content textarea:
+   - The primary textarea has id="result-content": document.querySelector('#result-content')
+   - This textarea contains the complete digest content
+   - Check if it exists and has content: document.querySelector('#result-content')?.value
+5. Extract content from the result-content textarea:
+   - Execute: document.querySelector('#result-content').value
+   - This should contain the full digest content (10,000+ characters)
+6. If result-content textarea is not available or empty, try alternative methods:
+   a) Click the "Copy all" button:
+      - Find: document.querySelector('button[onclick*=\"copyFullDigest\"]') or button with text "Copy all"
+      - Click it to copy content to clipboard
+      - Read from clipboard: navigator.clipboard.readText()
+   b) Click the "Download" button:
+      - Find button with text "Download" 
+      - Click it to download the file
+      - Read the downloaded file content
+   c) Extract from all textareas:
+      - Execute: Array.from(document.querySelectorAll('textarea')).map(ta => ta.value).join('\\n\\n')
+7. Use content in this priority order:
+   - First: result-content textarea value (#result-content)
+   - Second: Clipboard content (from "Copy all" button)
+   - Third: Downloaded file content (from "Download" button)
+   - Fourth: Combined content from all textareas
+8. Verify the extracted content:
    - Should start with "Repository: [owner]/[repo]"
    - Should contain "Directory structure:" section
-   - Should contain "FILE:" markers
-   - Total length should be 10,000+ characters
-10. Return the complete, unmodified text content
+   - Should contain "FILE:" markers for individual files
+   - Total length should be 10,000+ characters (thousands of lines)
+9. Return the complete, unmodified text content
 
 EXPECTED DATA FORMAT:
 - Content starts with: "Repository: [owner]/[repo]"
