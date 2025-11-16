@@ -18,11 +18,9 @@
   },
   "dependencies": {
     "@daytonaio/sdk": "^0.115.0",
-    "@magarcia/gitingest": "^1.1.0",
     "@octokit/rest": "^22.0.1",
     "@supabase/ssr": "^0.5.1",
     "@supabase/supabase-js": "^2.45.4",
-    "browser-use-sdk": "^2.0.7",
     "convex": "^1.16.2",
     "next": "^15.0.3",
     "node-polyfill-webpack-plugin": "^4.1.0",

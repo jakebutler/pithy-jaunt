@@ -6,6 +6,3 @@
 openai>=1.0.0
 anthropic>=0.18.0
 
-# Git Ingest - for generating codebase digests
-gitingest>=1.0.0
-
