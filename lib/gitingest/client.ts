@@ -79,8 +79,8 @@ async function processWithBrowserUseCloud(repoUrl: string): Promise<string> {
 
 BOUNDARIES:
 - Visit ONLY: ${gitingestUrl} (single page - this is the direct URL to the processed digest)
-- Extract content from the page after clicking "Copy all" button
-- Wait maximum 60 seconds for page to load
+- Extract content from the #result-content textarea or use "Copy all"/"Download" buttons
+- Wait maximum 120 seconds for page to load and process
 
 SPECIFIC INSTRUCTIONS:
 1. Navigate to ${gitingestUrl}
