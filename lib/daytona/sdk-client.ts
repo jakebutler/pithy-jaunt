@@ -74,22 +74,9 @@ export async function createWorkspaceViaSDK(
       workspaceId: sandbox.id,
     });
 
-    // Clone the repo into the sandbox after creation
-    // The execution script in the Docker image will handle the repo cloning,
-    // but we can also clone it here if needed
-    if (params.repoUrl) {
-      try {
-        // The sandbox.git.clone method should be available
-        await sandbox.git.clone({
-          url: params.repoUrl,
-          branch: params.branch,
-        });
-        console.log("[Daytona SDK] Repository cloned successfully");
-      } catch (gitError: any) {
-        console.warn("[Daytona SDK] Failed to clone repo via SDK, but workspace created:", gitError.message);
-        console.warn("[Daytona SDK] The execution script in the image should handle repo cloning");
-      }
-    }
+    // Note: The execution script in the Docker image (execution.sh) will handle repo cloning
+    // The repo URL and branch are passed via environment variables (TARGET_REPO, BRANCH_NAME)
+    // So we don't need to clone it here via the SDK
 
     return {
       workspaceId: sandbox.id,
