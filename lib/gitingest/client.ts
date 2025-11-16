@@ -92,34 +92,27 @@ SPECIFIC INSTRUCTIONS:
    - If hasContent is true, proceed to step 4
    - If hasContent is false, wait 15 more seconds and check again
 4. Extract content from #result-content textarea:
-   - Execute: const textareaContent = document.querySelector('#result-content').value;
-   - Check the length: textareaContent.length
-   - Store this content (even if it says "cropped" - it may still be substantial)
-5. ALWAYS click "Copy all" button to get complete content:
+   - Execute: const textarea = document.querySelector('#result-content');
+   - Execute: const textareaContent = textarea ? textarea.value : '';
+   - Execute: const textareaLength = textareaContent.length;
+   - Log: console.log('Textarea content length:', textareaLength);
+   - Store this content - it may be 300k+ characters (this is the FULL content)
+5. Click "Copy all" button to get complete content:
    - Find the button: document.querySelector('button[onclick*=\"copyFullDigest\"]')
    - Click it
    - Wait 5 seconds for clipboard to update
-   - Read from clipboard: await navigator.clipboard.readText()
-   - The clipboard should contain the FULL, UNTRUNCATED content
-6. Compare content lengths and use the LONGEST:
-   - textareaLength = textareaContent.length
-   - clipboardLength = (clipboard content).length
-   - Use whichever is LONGER
-7. If clipboard is empty or shorter, try "Download" button:
-   - Find button with text "Download" or download icon
-   - Click it to trigger download
-   - Wait 10 seconds for download to complete
-   - Read the downloaded file content
-8. Final content selection (use LONGEST available):
-   - FIRST: Clipboard content (from "Copy all") - should be the longest
-   - SECOND: Downloaded file content
-   - THIRD: #result-content textarea value
-   - FOURTH: Longest textarea from all textareas
-9. Return the content:
-   - Return the COMPLETE, UNMODIFIED content (do not summarize)
-   - Return ALL characters - even if it's 300k+ characters
+   - Try to read from clipboard: 
+     * Execute: navigator.clipboard.readText().then(text => text).catch(err => '')
+     * If clipboard read fails, that's okay - use textarea content instead
+6. Compare and use the LONGEST content:
+   - If clipboard content is longer than textarea, use clipboard
+   - Otherwise, use textarea content (which should be 300k+ characters)
+7. Return the content:
+   - Return the COMPLETE, UNMODIFIED content from the textarea or clipboard
+   - Return ALL characters - do NOT summarize or truncate
+   - Even if the content is 300k+ characters, return it ALL
    - Content should start with "Repository:" and contain "Directory structure:" and "FILE:"
-   - Do NOT truncate or summarize - return the FULL text
+   - IMPORTANT: Return the FULL textarea.value content, not a summary
 
 EXPECTED DATA FORMAT:
 - Content starts with: "Repository: [owner]/[repo]"
