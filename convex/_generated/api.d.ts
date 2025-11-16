@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as executionLogs from "../executionLogs.js";
 import type * as repos from "../repos.js";
 import type * as tasks from "../tasks.js";
 import type * as users from "../users.js";
@@ -20,6 +21,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  executionLogs: typeof executionLogs;
   repos: typeof repos;
   tasks: typeof tasks;
   users: typeof users;

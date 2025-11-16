@@ -35,11 +35,15 @@ jobs:
         env:
           NODE_ENV: test
           NEXT_PUBLIC_APP_URL: http://localhost:3000
-          # Add test environment variables here
-          # NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
-          # NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
-          # CONVEX_DEPLOYMENT: ${{ secrets.TEST_CONVEX_DEPLOYMENT }}
-          # GITHUB_TOKEN: ${{ secrets.TEST_GITHUB_TOKEN }}
+          # Supabase (required for authentication tests)
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+          # Convex (required for data persistence)
+          CONVEX_DEPLOYMENT: ${{ secrets.TEST_CONVEX_DEPLOYMENT }}
+          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.TEST_CONVEX_URL }}
+          # GitHub (required for repository connection tests)
+          GITHUB_TOKEN: ${{ secrets.TEST_GITHUB_TOKEN }}
 
       - name: Upload test results
         if: always()

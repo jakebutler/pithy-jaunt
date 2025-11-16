@@ -169,7 +169,6 @@ export async function POST(request: Request) {
 
       // Store error in execution logs if available
       try {
-        // @ts-expect-error - executionLogs will be available after Convex regenerates types
         await convexClient.mutation(api.executionLogs.createLog, {
           taskId: task._id,
           workspaceId: workspaceId || task.assignedWorkspaceId || "",
