@@ -36,42 +36,72 @@ export async function createWorkspace(params: {
     url: `${DAYTONA_API_URL}/workspace`,
     hasApiKey: !!DAYTONA_API_KEY,
     apiKeyLength: DAYTONA_API_KEY?.length || 0,
+    apiKeyPrefix: DAYTONA_API_KEY?.substring(0, 10) || "none",
     snapshot: "butlerjake/pithy-jaunt-daytona:v1.0.0",
     template: "pithy-jaunt-dev",
     repoUrl: params.repoUrl,
     branch: params.branch,
   });
 
-  const response = await fetch(`${DAYTONA_API_URL}/workspace`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${DAYTONA_API_KEY}`,
-      "User-Agent": "PithyJaunt/1.0",
-    },
-    body: JSON.stringify({
-      // Daytona requires snapshots to be created in the dashboard first
-      // Try snapshot name first (matches image name)
-      snapshot: "butlerjake/pithy-jaunt-daytona:v1.0.0",
-      // Also try template name as fallback
-      template: "pithy-jaunt-dev",
-      repoUrl: params.repoUrl,
-      branch: params.branch,
-      env: {
-        TARGET_REPO: params.repoUrl,
-        BRANCH_NAME: `pj/${params.taskId}`,
-        TASK_ID: params.taskId,
-        AGENT_PROMPT: params.taskDescription,
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
-        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
-        GITHUB_TOKEN: process.env.GITHUB_TOKEN || "",
-        MODEL_PROVIDER: params.modelProvider,
-        MODEL: params.model,
-        WEBHOOK_URL: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/webhook/daytona`,
-        KEEP_ALIVE: params.keepWorkspaceAlive ? "true" : "false",
+  let response: Response;
+  try {
+    response = await fetch(`${DAYTONA_API_URL}/workspace`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${DAYTONA_API_KEY}`,
+        "User-Agent": "PithyJaunt/1.0",
       },
-    }),
-  });
+      body: JSON.stringify({
+        // Daytona requires snapshots to be created in the dashboard first
+        // Try snapshot name first (matches image name)
+        snapshot: "butlerjake/pithy-jaunt-daytona:v1.0.0",
+        // Also try template name as fallback
+        template: "pithy-jaunt-dev",
+        repoUrl: params.repoUrl,
+        branch: params.branch,
+        env: {
+          TARGET_REPO: params.repoUrl,
+          BRANCH_NAME: `pj/${params.taskId}`,
+          TASK_ID: params.taskId,
+          AGENT_PROMPT: params.taskDescription,
+          OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
+          ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
+          GITHUB_TOKEN: process.env.GITHUB_TOKEN || "",
+          MODEL_PROVIDER: params.modelProvider,
+          MODEL: params.model,
+          WEBHOOK_URL: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/webhook/daytona`,
+          KEEP_ALIVE: params.keepWorkspaceAlive ? "true" : "false",
+        },
+      }),
+    });
+  } catch (fetchError: any) {
+    // Handle network errors, DNS errors, connection refused, etc.
+    console.error("[Daytona] Fetch error:", {
+      message: fetchError.message,
+      name: fetchError.name,
+      code: fetchError.code,
+      cause: fetchError.cause,
+      url: `${DAYTONA_API_URL}/workspace`,
+      apiUrl: DAYTONA_API_URL,
+    });
+
+    // Provide helpful error messages based on error type
+    let errorMessage = "Failed to connect to Daytona API";
+    if (fetchError.message?.includes("ECONNREFUSED")) {
+      errorMessage = `Connection refused. Check if DAYTONA_API_URL is correct: ${DAYTONA_API_URL}`;
+    } else if (fetchError.message?.includes("ENOTFOUND") || fetchError.message?.includes("getaddrinfo")) {
+      errorMessage = `DNS lookup failed. Check if DAYTONA_API_URL is correct: ${DAYTONA_API_URL}`;
+    } else if (fetchError.message?.includes("timeout")) {
+      errorMessage = `Request timeout. The Daytona API may be slow or unreachable: ${DAYTONA_API_URL}`;
+    } else if (fetchError.message?.includes("certificate") || fetchError.message?.includes("SSL")) {
+      errorMessage = `SSL/TLS error. Check if the Daytona API URL uses HTTPS correctly: ${DAYTONA_API_URL}`;
+    } else {
+      errorMessage = `Network error: ${fetchError.message || "Unknown error"}. Check DAYTONA_API_URL: ${DAYTONA_API_URL}`;
+    }
+
+    throw new Error(errorMessage);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
