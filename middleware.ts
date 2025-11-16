@@ -6,14 +6,31 @@ import { NextResponse, type NextRequest } from "next/server";
  * Protects routes that require authentication
  */
 export async function middleware(request: NextRequest) {
+  // Check for required environment variables
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("Missing Supabase environment variables in middleware");
+    // Return a 500 error response for missing env vars
+    return new NextResponse(
+      JSON.stringify({
+        error: "Server configuration error",
+        message: "Missing required environment variables",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -30,38 +47,51 @@ export async function middleware(request: NextRequest) {
           );
         },
       },
+    });
+
+    // Refresh session if expired - required for Server Components
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    // Protected routes that require authentication
+    const protectedRoutes = ["/dashboard", "/repos", "/tasks", "/settings"];
+    const isProtectedRoute = protectedRoutes.some((route) =>
+      request.nextUrl.pathname.startsWith(route)
+    );
+
+    // Redirect to login if accessing protected route without session
+    if (isProtectedRoute && !session) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("returnTo", request.nextUrl.pathname);
+      return NextResponse.redirect(loginUrl);
     }
-  );
 
-  // Refresh session if expired - required for Server Components
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    // Redirect to dashboard if accessing auth pages while logged in
+    const authRoutes = ["/login", "/signup", "/magic-link"];
+    const isAuthRoute = authRoutes.some((route) =>
+      request.nextUrl.pathname.startsWith(route)
+    );
 
-  // Protected routes that require authentication
-  const protectedRoutes = ["/dashboard", "/repos", "/tasks", "/settings"];
-  const isProtectedRoute = protectedRoutes.some((route) =>
-    request.nextUrl.pathname.startsWith(route)
-  );
+    if (isAuthRoute && session) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
 
-  // Redirect to login if accessing protected route without session
-  if (isProtectedRoute && !session) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("returnTo", request.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
+    return supabaseResponse;
+  } catch (error) {
+    console.error("Middleware error:", error);
+    // Return error response instead of crashing
+    return new NextResponse(
+      JSON.stringify({
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
-
-  // Redirect to dashboard if accessing auth pages while logged in
-  const authRoutes = ["/login", "/signup", "/magic-link"];
-  const isAuthRoute = authRoutes.some((route) =>
-    request.nextUrl.pathname.startsWith(route)
-  );
-
-  if (isAuthRoute && session) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  return supabaseResponse;
 }
 
 export const config = {
