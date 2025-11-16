@@ -74,26 +74,9 @@ fi
 git config --global user.name "Pithy Jaunt Bot"
 git config --global user.email "bot@pithy-jaunt.dev"
 
-# Configure GitHub CLI if token is provided
-# Use explicit error handling to prevent script from exiting on failure
-if [ -n "${GITHUB_TOKEN:-}" ]; then
-  if command -v gh &> /dev/null; then
-    # Temporarily disable exit on error for this command
-    set +e
-    echo "$GITHUB_TOKEN" | gh auth login --with-token 2>&1
-    gh_auth_status=$?
-    set -e
-    
-    if [ $gh_auth_status -eq 0 ]; then
-      echo "[pj] GitHub CLI authenticated"
-    else
-      echo "[pj] Warning: GitHub CLI authentication failed (exit code: $gh_auth_status), but continuing anyway"
-      echo "[pj] PR creation may fail later if GitHub CLI is required"
-    fi
-  else
-    echo "[pj] Warning: GitHub CLI (gh) not found, but continuing anyway"
-    echo "[pj] PR creation may fail later if GitHub CLI is required"
-  fi
+# Validate GitHub token if provided (needed for PR creation)
+if [ -z "${GITHUB_TOKEN:-}" ]; then
+  echo "[pj] Warning: GITHUB_TOKEN not set, PR creation will fail"
 fi
 
 # Create working directory
@@ -220,8 +203,27 @@ fi
 
 echo "[pj] Branch pushed successfully"
 
-# Create PR using GitHub CLI
+# Create PR using GitHub REST API
 echo "[pj] Creating pull request..."
+
+# Parse repository URL to extract owner and repo
+# Supports both https://github.com/owner/repo.git and git@github.com:owner/repo.git
+REPO_URL="$TARGET_REPO"
+if [[ "$REPO_URL" =~ github\.com[:/]([^/]+)/([^/]+?)(\.git)?$ ]]; then
+  REPO_OWNER="${BASH_REMATCH[1]}"
+  REPO_NAME="${BASH_REMATCH[2]}"
+  # Remove .git suffix if present
+  REPO_NAME="${REPO_NAME%.git}"
+  echo "[pj] Repository: $REPO_OWNER/$REPO_NAME"
+else
+  handle_error "Failed to parse repository URL: $REPO_URL"
+fi
+
+# Validate GitHub token
+if [ -z "${GITHUB_TOKEN:-}" ]; then
+  handle_error "GITHUB_TOKEN is required to create pull request"
+fi
+
 PR_BODY="Automated change for task $TASK_ID
 
 **Task Description:**
@@ -231,24 +233,61 @@ $AGENT_PROMPT
 **Model:** ${MODEL_PROVIDER:-openai}/${MODEL:-gpt-4o}
 "
 
+# Create PR using GitHub REST API
 PR_URL=""
-if PR_OUTPUT=$(gh pr create \
-  --title "Pithy Jaunt: $TASK_ID" \
-  --body "$PR_BODY" \
-  --base "$BASE_BRANCH" \
-  --head "$BRANCH" \
-  2>&1); then
-  # Extract PR URL from output
-  PR_URL=$(echo "$PR_OUTPUT" | grep -o 'https://github.com/[^ ]*' | head -1)
+PR_PAYLOAD=$(cat <<EOF
+{
+  "title": "Pithy Jaunt: $TASK_ID",
+  "body": $(echo "$PR_BODY" | jq -Rs .),
+  "head": "$BRANCH",
+  "base": "$BASE_BRANCH"
+}
+EOF
+)
+
+# Temporarily disable exit on error to handle PR creation errors
+set +e
+PR_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+  "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/pulls" \
+  -H "Authorization: token $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  -H "Content-Type: application/json" \
+  -d "$PR_PAYLOAD" 2>&1)
+PR_HTTP_CODE=$(echo "$PR_RESPONSE" | tail -1)
+PR_BODY_RESPONSE=$(echo "$PR_RESPONSE" | sed '$d')
+set -e
+
+if [ "$PR_HTTP_CODE" = "201" ]; then
+  # PR created successfully
+  PR_URL=$(echo "$PR_BODY_RESPONSE" | jq -r '.html_url // .url // ""')
+  if [ -z "$PR_URL" ] || [ "$PR_URL" = "null" ]; then
+    # Fallback: construct URL manually
+    PR_URL="https://github.com/$REPO_OWNER/$REPO_NAME/pull/$(echo "$PR_BODY_RESPONSE" | jq -r '.number')"
+  fi
   echo "[pj] Pull request created: $PR_URL"
-else
-  # Check if PR already exists
-  if echo "$PR_OUTPUT" | grep -q "already exists"; then
-    PR_URL=$(gh pr view "$BRANCH" --json url --jq '.url' 2>/dev/null || echo "")
+elif [ "$PR_HTTP_CODE" = "422" ]; then
+  # PR might already exist, try to find it
+  echo "[pj] PR creation returned 422, checking if PR already exists..."
+  set +e
+  EXISTING_PR=$(curl -s -X GET \
+    "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/pulls?head=$REPO_OWNER:$BRANCH&state=all" \
+    -H "Authorization: token $GITHUB_TOKEN" \
+    -H "Accept: application/vnd.github.v3+json" 2>&1)
+  set -e
+  
+  EXISTING_PR_URL=$(echo "$EXISTING_PR" | jq -r '.[0].html_url // .[0].url // ""' 2>/dev/null || echo "")
+  if [ -n "$EXISTING_PR_URL" ] && [ "$EXISTING_PR_URL" != "null" ]; then
+    PR_URL="$EXISTING_PR_URL"
     echo "[pj] Pull request already exists: $PR_URL"
   else
-    handle_error "Failed to create pull request: $PR_OUTPUT"
+    # Parse error message from response
+    ERROR_MSG=$(echo "$PR_BODY_RESPONSE" | jq -r '.message // "Unknown error"' 2>/dev/null || echo "Failed to create PR (HTTP $PR_HTTP_CODE)")
+    handle_error "Failed to create pull request: $ERROR_MSG"
   fi
+else
+  # Other error
+  ERROR_MSG=$(echo "$PR_BODY_RESPONSE" | jq -r '.message // "Unknown error"' 2>/dev/null || echo "Failed to create PR (HTTP $PR_HTTP_CODE)")
+  handle_error "Failed to create pull request: $ERROR_MSG"
 fi
 
 # Run Browser Use tests if config present (optional)
