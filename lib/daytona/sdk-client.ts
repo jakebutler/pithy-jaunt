@@ -63,15 +63,20 @@ export async function createWorkspaceViaSDK(
   };
 
   try {
-    // Use snapshot approach - CreateSandboxFromSnapshotParams extends CreateSandboxBaseParams
-    // which includes envVars but not repo. We'll clone the repo after creation.
+    // Try using the image directly instead of snapshot name
+    // The snapshot name might not be recognized, so use the Docker image directly
+    const image = Image.base(DAYTONA_IMAGE_NAME);
+    
+    console.log("[Daytona SDK] Creating workspace with image:", DAYTONA_IMAGE_NAME);
+    
     const sandbox = await daytona.create({
-      snapshot: DAYTONA_SNAPSHOT_NAME,
+      image,
       envVars,
     });
 
     console.log("[Daytona SDK] Workspace created successfully:", {
       workspaceId: sandbox.id,
+      imageUsed: DAYTONA_IMAGE_NAME,
     });
 
     // Note: The execution script in the Docker image (execution.sh) will handle repo cloning
