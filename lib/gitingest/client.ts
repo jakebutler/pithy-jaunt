@@ -84,10 +84,12 @@ BOUNDARIES:
 
 SPECIFIC INSTRUCTIONS:
 1. Navigate to ${gitingestUrl}
-2. WAIT for the page to fully load (10-30 seconds) - the page uses JavaScript and may need to process the repository
+2. WAIT for the page to fully load (15-45 seconds) - the page uses JavaScript and may need to process the repository
 3. Check if the page is processing:
-   - If you see "Processing..." or loading indicators, wait for them to complete (up to 60 seconds total)
-   - The page may redirect or show a form if the repository hasn't been processed yet
+   - If you see "Processing..." or "Loading..." text, wait patiently for it to complete
+   - The page may show a form with the repository URL pre-filled - this is normal, wait for processing
+   - Wait up to 120 seconds total for the page to finish processing and show the digest content
+   - DO NOT give up if you see "Processing..." - this means the page is working, just wait longer
 4. Once the page has loaded, locate the "Copy all" button:
    - The button has the text "Copy all" and an onclick attribute: onclick="copyFullDigest()"
    - It may be found using: document.querySelector('button[onclick="copyFullDigest()"]') or by text "Copy all"
