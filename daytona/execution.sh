@@ -8,6 +8,7 @@ send_webhook() {
   local status=$2
   local error_msg=${3:-""}
   local pr_url=${4:-""}
+  local message=${5:-""}
   
   if [ -z "$WEBHOOK_URL" ]; then
     echo "[pj] Warning: WEBHOOK_URL not set, skipping webhook"
@@ -22,7 +23,8 @@ send_webhook() {
   "branchName": "${BRANCH_NAME:-}",
   "prUrl": "$pr_url",
   "status": "$status",
-  "error": "$error_msg"
+  "error": "$error_msg",
+  "message": "$message"
 }
 EOF
 )
@@ -84,7 +86,7 @@ cd /tmp/pj
 
 # Clone repository
 echo "[pj] Cloning repository: $TARGET_REPO"
-send_webhook "task.progress" "running" "" "" || true  # Send progress update (non-blocking)
+send_webhook "task.progress" "running" "" "" "Cloning repository..." || true  # Send progress update (non-blocking)
 if ! git clone "$TARGET_REPO" repo; then
   handle_error "Failed to clone repository: $TARGET_REPO"
 fi
@@ -157,6 +159,7 @@ fi
 # Run AI agent to generate patch
 echo "[pj] Running AI agent to generate code changes..."
 echo "[pj] Task description: $AGENT_PROMPT"
+send_webhook "task.progress" "running" "" "" "Running AI agent to generate code changes..." || true  # Send progress update (non-blocking)
 
 if ! python3 /app/agent-runner.py \
   --prompt-file /app/system-prompt.md \
