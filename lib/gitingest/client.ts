@@ -57,18 +57,25 @@ BOUNDARIES:
 
 SPECIFIC INSTRUCTIONS:
 1. Navigate to https://gitingest.com/
-2. Locate the text input field (textbox with placeholder "https://github.com/...")
-3. Clear any existing text and enter exactly: ${repoUrl}
-4. Click the "Ingest" button (button element immediately next to the input field)
-5. Wait for processing to complete:
+2. WAIT for the page to fully load (5-10 seconds) - the page uses JavaScript and may take time to render
+3. Verify the page has loaded by checking for:
+   - A heading containing "Prompt-friendly codebase" or "Gitingest"
+   - A text input field visible on the page
+   - If the page appears empty, wait longer (up to 30 seconds) and refresh if needed
+4. Locate the text input field (textbox with placeholder "https://github.com/..." or similar)
+5. Clear any existing text and enter exactly: ${repoUrl}
+6. Click the "Ingest" button (button element immediately next to the input field, labeled "Ingest")
+7. Wait for processing to complete:
    - Monitor the page for 60-180 seconds
-   - Look for URL changes or loading indicators
+   - Look for URL changes, loading indicators, or progress messages
    - Wait until a textarea or pre element appears with substantial content (10,000+ characters)
-6. Extract the digest content:
+   - The page may show "Processing..." or similar indicators
+8. Extract the digest content:
    - Find the textarea or pre element containing the digest
    - Use JavaScript if needed: document.querySelector('textarea')?.value || document.querySelector('pre')?.textContent
+   - Check all textarea and pre elements on the page
    - Verify content starts with "Repository:" and contains "Directory structure:" and "FILE:"
-7. Return the complete, unmodified text content
+9. Return the complete, unmodified text content
 
 EXPECTED DATA FORMAT:
 - Content starts with: "Repository: [owner]/[repo]"
@@ -78,6 +85,7 @@ EXPECTED DATA FORMAT:
 - Format: Plain text, no HTML markup
 
 CRITICAL REQUIREMENTS:
+- Wait for initial page load before interacting (GitIngest.com uses JavaScript)
 - Do NOT summarize, truncate, or modify the content
 - Return the FULL text exactly as displayed
 - If content doesn't appear after 180 seconds, report the error
