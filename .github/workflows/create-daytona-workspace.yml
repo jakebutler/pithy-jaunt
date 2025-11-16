@@ -65,9 +65,7 @@ jobs:
       - name: Authenticate with Daytona
         env:
           DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
-          PATH: ${{ env.PATH }}:$HOME/.daytona/bin
         run: |
-          export PATH="$HOME/.daytona/bin:$PATH"
           daytona auth login --api-key "$DAYTONA_API_KEY"
 
       - name: Create Daytona Workspace
@@ -85,9 +83,7 @@ jobs:
           MODEL: ${{ inputs.model }}
           WEBHOOK_URL: ${{ inputs.webhook_url }}
           KEEP_ALIVE: ${{ inputs.keep_alive }}
-          PATH: ${{ env.PATH }}:$HOME/.daytona/bin
         run: |
-          export PATH="$HOME/.daytona/bin:$PATH"
           echo "Creating Daytona workspace..."
           echo "Snapshot: ${{ inputs.snapshot_name }}"
           echo "Repository: ${{ inputs.repo_url }}"
