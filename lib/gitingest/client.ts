@@ -84,38 +84,35 @@ BOUNDARIES:
 
 SPECIFIC INSTRUCTIONS:
 1. Navigate to ${gitingestUrl}
-2. Wait 20-30 seconds for the page to load (GitIngest uses JavaScript)
-3. IMMEDIATELY execute JavaScript to check for elements (do not rely on visual inspection):
-   - Execute: document.querySelector('#result-content')?.value || 'not found'
-   - Execute: document.querySelectorAll('textarea').length
-   - Execute: document.querySelector('button[onclick*=\"copyFullDigest\"]') ? 'found' : 'not found'
-4. If #result-content textarea exists and has content:
-   - Extract: document.querySelector('#result-content').value
-   - This is the PRIMARY source - use this content
-5. If #result-content is empty or doesn't exist, wait 30 more seconds and check again:
-   - The page may still be processing
-   - Re-check: document.querySelector('#result-content')?.value
-6. Once #result-content has content, extract it:
-   - Execute: const content = document.querySelector('#result-content').value;
-   - Return this content directly
-7. If #result-content never loads, try fallback methods:
-   a) Click "Copy all" button and read clipboard:
+2. Wait 30 seconds for initial page load
+3. Check for content using JavaScript (repeat every 15 seconds, up to 120 seconds total):
+   - Execute: const resultContent = document.querySelector('#result-content');
+   - Execute: const content = resultContent ? resultContent.value : '';
+   - Execute: const hasContent = content && content.length > 1000;
+   - If hasContent is true, proceed to step 4
+   - If hasContent is false, wait 15 more seconds and check again
+4. Extract content from #result-content textarea:
+   - Execute: document.querySelector('#result-content').value
+   - Store this as the primary content
+   - This should be 10,000+ characters
+5. If #result-content is still empty after 120 seconds, try fallback:
+   a) Check all textareas:
+      - Execute: Array.from(document.querySelectorAll('textarea')).map(ta => ({id: ta.id, length: ta.value.length, value: ta.value}))
+      - Find the textarea with the longest value
+      - Use that textarea's value
+   b) Click "Copy all" button:
       - Find: document.querySelector('button[onclick*=\"copyFullDigest\"]')
       - Click it
+      - Wait 2 seconds
       - Read: navigator.clipboard.readText()
-   b) Click "Download" button and read downloaded file
-   c) Extract from all textareas:
-      - Array.from(document.querySelectorAll('textarea')).map(ta => ta.value).join('\\n\\n')
-8. Priority order for content:
-   - FIRST: #result-content textarea value (document.querySelector('#result-content').value)
-   - SECOND: Clipboard content (from "Copy all")
-   - THIRD: All textareas combined
-9. Verify extracted content:
-   - Starts with "Repository: [owner]/[repo]"
-   - Contains "Directory structure:"
-   - Contains "FILE:" markers
-   - Length: 10,000+ characters
-10. Return the complete, unmodified text content
+6. Use content in priority order:
+   - FIRST: #result-content textarea value (if length > 1000)
+   - SECOND: Longest textarea value from all textareas
+   - THIRD: Clipboard content (from "Copy all")
+7. Verify and return:
+   - Content should start with "Repository:"
+   - Should contain "Directory structure:" and "FILE:"
+   - Return the complete, unmodified text (even if shorter than 10,000 chars)
 
 EXPECTED DATA FORMAT:
 - Content starts with: "Repository: [owner]/[repo]"
