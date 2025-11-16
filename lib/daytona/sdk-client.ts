@@ -97,13 +97,59 @@ export async function createWorkspaceViaSDK(
       snapshotUsed: DAYTONA_SNAPSHOT_NAME,
     });
 
-    // Note: The execution script in the Docker image (execution.sh) will handle repo cloning
-    // The repo URL and branch are passed via environment variables (TARGET_REPO, BRANCH_NAME)
-    // So we don't need to clone it here via the SDK
+    // Execute the execution script in the workspace
+    // The script is located at /app/execution.sh and will handle the entire task execution
+    // We execute it asynchronously in a session so it doesn't block the API call
+    // The script will run in the background and send webhooks as it progresses
+    console.log("[Daytona SDK] Executing task script in workspace...");
+    
+    try {
+      // Create a persistent session for this task execution
+      const sessionId = `task-${params.taskId}`;
+      await sandbox.process.createSession(sessionId);
+
+      // Set environment variables in the session
+      // Note: envVars are already set at workspace creation, but we ensure they're available in the session
+      const envExports = Object.entries(envVars)
+        .map(([key, value]) => `export ${key}="${value}"`)
+        .join(" && ");
+
+      if (envExports) {
+        await sandbox.process.executeSessionCommand(sessionId, {
+          command: envExports,
+        });
+      }
+
+      // Execute the script asynchronously (non-blocking)
+      // The script will run in the background and send webhooks to update the task status
+      const asyncCmd = await sandbox.process.executeSessionCommand(sessionId, {
+        command: "cd /app && /app/execution.sh",
+        runAsync: true, // Execute asynchronously so it doesn't block
+      });
+
+      console.log("[Daytona SDK] Execution script started asynchronously:", {
+        sessionId,
+        commandId: asyncCmd.cmdId,
+        status: "running",
+      });
+
+      // Don't wait for the script to complete - it will send webhooks as it progresses
+      // The script will handle its own completion and send a webhook when done
+    } catch (execError: any) {
+      // Log the error but don't fail the workspace creation
+      // The script might still work, or webhooks will report failures
+      console.error("[Daytona SDK] Error executing script:", {
+        error: execError.message,
+        name: execError.name,
+        stack: execError.stack,
+      });
+      // Continue - the workspace is created, even if script execution failed
+      // Webhooks will report the actual status
+    }
 
     return {
       workspaceId: sandbox.id,
-      status: "creating" as const, // Default to creating, will be updated via webhook
+      status: "running" as const, // Workspace is running and script is executing
     };
   } catch (error: any) {
     console.error("[Daytona SDK] Error creating workspace:", {
