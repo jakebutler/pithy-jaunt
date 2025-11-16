@@ -84,39 +84,38 @@ BOUNDARIES:
 
 SPECIFIC INSTRUCTIONS:
 1. Navigate to ${gitingestUrl}
-2. WAIT for the page to fully load (15-45 seconds) - the page uses JavaScript and may need to process the repository
-3. Check if the page is processing:
-   - If you see "Processing..." or "Loading..." text, wait patiently (up to 120 seconds total)
-   - The page may show a form with the repository URL pre-filled - this is normal, wait for processing
-4. Once the page has loaded, locate the main content textarea:
-   - The primary textarea has id="result-content": document.querySelector('#result-content')
-   - This textarea contains the complete digest content
-   - Check if it exists and has content: document.querySelector('#result-content')?.value
-5. Extract content from the result-content textarea:
-   - Execute: document.querySelector('#result-content').value
-   - This should contain the full digest content (10,000+ characters)
-6. If result-content textarea is not available or empty, try alternative methods:
-   a) Click the "Copy all" button:
-      - Find: document.querySelector('button[onclick*=\"copyFullDigest\"]') or button with text "Copy all"
-      - Click it to copy content to clipboard
-      - Read from clipboard: navigator.clipboard.readText()
-   b) Click the "Download" button:
-      - Find button with text "Download" 
-      - Click it to download the file
-      - Read the downloaded file content
+2. Wait 20-30 seconds for the page to load (GitIngest uses JavaScript)
+3. IMMEDIATELY execute JavaScript to check for elements (do not rely on visual inspection):
+   - Execute: document.querySelector('#result-content')?.value || 'not found'
+   - Execute: document.querySelectorAll('textarea').length
+   - Execute: document.querySelector('button[onclick*=\"copyFullDigest\"]') ? 'found' : 'not found'
+4. If #result-content textarea exists and has content:
+   - Extract: document.querySelector('#result-content').value
+   - This is the PRIMARY source - use this content
+5. If #result-content is empty or doesn't exist, wait 30 more seconds and check again:
+   - The page may still be processing
+   - Re-check: document.querySelector('#result-content')?.value
+6. Once #result-content has content, extract it:
+   - Execute: const content = document.querySelector('#result-content').value;
+   - Return this content directly
+7. If #result-content never loads, try fallback methods:
+   a) Click "Copy all" button and read clipboard:
+      - Find: document.querySelector('button[onclick*=\"copyFullDigest\"]')
+      - Click it
+      - Read: navigator.clipboard.readText()
+   b) Click "Download" button and read downloaded file
    c) Extract from all textareas:
-      - Execute: Array.from(document.querySelectorAll('textarea')).map(ta => ta.value).join('\\n\\n')
-7. Use content in this priority order:
-   - First: result-content textarea value (#result-content)
-   - Second: Clipboard content (from "Copy all" button)
-   - Third: Downloaded file content (from "Download" button)
-   - Fourth: Combined content from all textareas
-8. Verify the extracted content:
-   - Should start with "Repository: [owner]/[repo]"
-   - Should contain "Directory structure:" section
-   - Should contain "FILE:" markers for individual files
-   - Total length should be 10,000+ characters (thousands of lines)
-9. Return the complete, unmodified text content
+      - Array.from(document.querySelectorAll('textarea')).map(ta => ta.value).join('\\n\\n')
+8. Priority order for content:
+   - FIRST: #result-content textarea value (document.querySelector('#result-content').value)
+   - SECOND: Clipboard content (from "Copy all")
+   - THIRD: All textareas combined
+9. Verify extracted content:
+   - Starts with "Repository: [owner]/[repo]"
+   - Contains "Directory structure:"
+   - Contains "FILE:" markers
+   - Length: 10,000+ characters
+10. Return the complete, unmodified text content
 
 EXPECTED DATA FORMAT:
 - Content starts with: "Repository: [owner]/[repo]"
