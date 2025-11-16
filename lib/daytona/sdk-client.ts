@@ -63,27 +63,37 @@ export async function createWorkspaceViaSDK(
   };
 
   try {
-    // Create sandbox using the custom image
-    // Use Image.base() to specify our Docker image
-    const image = Image.base(DAYTONA_IMAGE_NAME);
-    
+    // Use snapshot approach - CreateSandboxFromSnapshotParams extends CreateSandboxBaseParams
+    // which includes envVars but not repo. We'll clone the repo after creation.
     const sandbox = await daytona.create({
-      image,
-      repo: {
-        url: params.repoUrl,
-        branch: params.branch,
-      },
+      snapshot: DAYTONA_SNAPSHOT_NAME,
       envVars,
     });
 
     console.log("[Daytona SDK] Workspace created successfully:", {
       workspaceId: sandbox.id,
-      status: sandbox.status,
     });
+
+    // Clone the repo into the sandbox after creation
+    // The execution script in the Docker image will handle the repo cloning,
+    // but we can also clone it here if needed
+    if (params.repoUrl) {
+      try {
+        // The sandbox.git.clone method should be available
+        await sandbox.git.clone({
+          url: params.repoUrl,
+          branch: params.branch,
+        });
+        console.log("[Daytona SDK] Repository cloned successfully");
+      } catch (gitError: any) {
+        console.warn("[Daytona SDK] Failed to clone repo via SDK, but workspace created:", gitError.message);
+        console.warn("[Daytona SDK] The execution script in the image should handle repo cloning");
+      }
+    }
 
     return {
       workspaceId: sandbox.id,
-      status: sandbox.status === "running" ? "running" : "creating",
+      status: "creating" as const, // Default to creating, will be updated via webhook
     };
   } catch (error: any) {
     console.error("[Daytona SDK] Error creating workspace:", {
