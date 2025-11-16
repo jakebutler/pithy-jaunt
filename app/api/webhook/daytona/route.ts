@@ -68,8 +68,8 @@ export async function POST(request: Request) {
             // Create new workspace record
             await convexClient.mutation(api.workspaces.createWorkspace, {
               daytonaId: workspaceId,
-              assignedTaskId: task._id,
-              status: (status || "creating") as "creating" | "running" | "stopped" | "terminated",
+              template: process.env.DAYTONA_SNAPSHOT_NAME || "pithy-jaunt-dev",
+              assignedTasks: [task._id],
             });
           } else {
             // Update existing workspace
