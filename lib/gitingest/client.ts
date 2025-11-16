@@ -1,8 +1,8 @@
 /**
  * Git Ingest Client
  * 
- * Uses the gitingest Python package to generate codebase digests.
- * This is the recommended approach for AI agents according to GitIngest documentation.
+ * Uses GitIngest to generate codebase digests.
+ * Falls back to URL hack approach when Python is not available (e.g., in Vercel serverless).
  */
 
 import { exec } from "child_process";
@@ -21,7 +21,51 @@ const PYTHON_SCRIPT_PATH = path.join(
 );
 
 /**
- * Process a repository through GitIngest using the Python package
+ * Convert GitHub URL to GitIngest URL (URL hack approach)
+ * Example: https://github.com/owner/repo -> https://gitingest.com/owner/repo
+ */
+function convertToGitIngestUrl(githubUrl: string): string {
+  return githubUrl.replace(/github\.com/g, "gitingest.com");
+}
+
+/**
+ * Fetch digest from GitIngest using URL hack approach
+ * This works by replacing github.com with gitingest.com in the URL
+ */
+async function fetchFromGitIngestUrl(repoUrl: string): Promise<string> {
+  const gitingestUrl = convertToGitIngestUrl(repoUrl);
+  
+  try {
+    const response = await fetch(gitingestUrl, {
+      headers: {
+        "User-Agent": "PithyJaunt/1.0",
+        "Accept": "text/plain, text/*, */*",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `GitIngest URL fetch failed: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const content = await response.text();
+    
+    if (!content || content.length < 100) {
+      throw new Error("GitIngest returned empty or insufficient content");
+    }
+
+    return content;
+  } catch (error: any) {
+    throw new Error(
+      `Failed to fetch from GitIngest URL: ${error.message || String(error)}`
+    );
+  }
+}
+
+/**
+ * Process a repository through GitIngest
+ * Tries Python package first, falls back to URL hack if Python is not available
  * 
  * @param repoUrl - The GitHub repository URL
  * @param useCloud - Not used (kept for API compatibility)
@@ -31,95 +75,98 @@ export async function processGitIngest(
   repoUrl: string,
   useCloud: boolean = true
 ): Promise<string> {
-
-  // Check if Python script exists
-  const fs = await import("fs/promises");
+  // First, try Python approach (for local development or environments with Python)
   try {
-    await fs.access(PYTHON_SCRIPT_PATH);
-  } catch (error) {
-    throw new Error(
-      `Git ingest automation script not found at ${PYTHON_SCRIPT_PATH}. Make sure the script is installed.`
-    );
-  }
-
-  // Execute Python script using the gitingest package
-  const command = `python3 "${PYTHON_SCRIPT_PATH}" --repo-url "${repoUrl}"`;
-  
-  try {
-    const { stdout, stderr } = await Promise.race([
-      execAsync(command, {
-        maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large repositories
-        timeout: SCRIPT_TIMEOUT,
-        env: {
-          ...process.env,
-          // Pass GitHub token if available (for private repos)
-          ...(process.env.GITHUB_TOKEN && {
-            GITHUB_TOKEN: process.env.GITHUB_TOKEN,
-          }),
-        },
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error("Git ingest processing timed out after 5 minutes")),
-          SCRIPT_TIMEOUT
-        )
-      ),
-    ]);
-
-    // Parse JSON output
-    let result: GitIngestResult;
+    const fs = await import("fs/promises");
     try {
-      result = JSON.parse(stdout.trim());
-    } catch (parseError) {
-      // If stdout is not JSON, check stderr
-      if (stderr) {
-        try {
-          result = JSON.parse(stderr.trim());
-        } catch {
+      await fs.access(PYTHON_SCRIPT_PATH);
+      
+      // Execute Python script using the gitingest package
+      const command = `python3 "${PYTHON_SCRIPT_PATH}" --repo-url "${repoUrl}"`;
+      
+      const { stdout, stderr } = await Promise.race([
+        execAsync(command, {
+          maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large repositories
+          timeout: SCRIPT_TIMEOUT,
+          env: {
+            ...process.env,
+            // Pass GitHub token if available (for private repos)
+            ...(process.env.GITHUB_TOKEN && {
+              GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+            }),
+          },
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Git ingest processing timed out after 5 minutes")),
+            SCRIPT_TIMEOUT
+          )
+        ),
+      ]);
+
+      // Parse JSON output
+      let result: GitIngestResult;
+      try {
+        result = JSON.parse(stdout.trim());
+      } catch (parseError) {
+        // If stdout is not JSON, check stderr
+        if (stderr) {
+          try {
+            result = JSON.parse(stderr.trim());
+          } catch {
+            throw new Error(
+              `Failed to parse git ingest result. stdout: ${stdout.substring(0, 200)}, stderr: ${stderr.substring(0, 200)}`
+            );
+          }
+        } else {
           throw new Error(
-            `Failed to parse git ingest result. stdout: ${stdout.substring(0, 200)}, stderr: ${stderr.substring(0, 200)}`
+            `Failed to parse git ingest result. Output: ${stdout.substring(0, 200)}`
           );
         }
-      } else {
-        throw new Error(
-          `Failed to parse git ingest result. Output: ${stdout.substring(0, 200)}`
-        );
       }
-    }
 
-    if (!result.success) {
-      throw new Error(result.error || "Git ingest processing failed");
-    }
+      if (!result.success) {
+        throw new Error(result.error || "Git ingest processing failed");
+      }
 
-    if (!result.content) {
-      throw new Error("Git ingest processing succeeded but no content was returned");
-    }
+      if (!result.content) {
+        throw new Error("Git ingest processing succeeded but no content was returned");
+      }
 
-    return result.content;
+      return result.content;
+    } catch (fsError) {
+      // Script not found, fall through to URL hack
+      throw new Error("Python script not accessible");
+    }
   } catch (error: any) {
-    if (error.code === "ETIMEDOUT" || error.message.includes("timed out")) {
-      throw new Error("Git ingest processing timed out after 5 minutes");
-    }
-    
-    if (error.killed) {
-      throw new Error("Git ingest processing was terminated (timeout or killed)");
-    }
-
-    // Try to parse error output
-    if (error.stderr) {
-      try {
-        const errorResult = JSON.parse(error.stderr.trim());
-        if (errorResult.error) {
-          throw new Error(errorResult.error);
-        }
-      } catch {
-        // Not JSON, use original error
-      }
+    // If Python approach fails (e.g., python3 not found, script error, etc.)
+    // Fall back to URL hack approach
+    if (
+      error.message.includes("command not found") ||
+      error.message.includes("not accessible") ||
+      error.message.includes("ENOENT") ||
+      error.code === "ENOENT"
+    ) {
+      console.log(
+        "Python not available, falling back to GitIngest URL hack approach"
+      );
+      return await fetchFromGitIngestUrl(repoUrl);
     }
 
-    throw new Error(
-      `Git ingest processing failed: ${error.message || String(error)}`
-    );
+    // For other errors (timeout, parsing, etc.), try URL hack as fallback
+    if (
+      error.code === "ETIMEDOUT" ||
+      error.message.includes("timed out") ||
+      error.message.includes("parse")
+    ) {
+      console.log(
+        "Python approach failed, falling back to GitIngest URL hack approach"
+      );
+      return await fetchFromGitIngestUrl(repoUrl);
+    }
+
+    // Re-throw if it's a different type of error
+    throw error;
   }
 }
 
