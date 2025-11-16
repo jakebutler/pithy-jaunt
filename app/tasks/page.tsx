@@ -51,7 +51,7 @@ export default async function TasksPage() {
               >
                 Repositories
               </Link>
-              <span className="text-sm text-gray-700">{session.user.email}</span>
+              <span className="text-sm text-gray-700">{user.email}</span>
               <form action="/api/auth/logout" method="POST">
                 <button
                   type="submit"
