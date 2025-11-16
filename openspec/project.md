@@ -103,10 +103,17 @@ The hackathon MVP focuses on: repo connect → CodeRabbit analysis → Daytona e
 ### Testing Strategy
 
 **Automated Testing:**
-- Browser Use for automated UI testing and screenshot capture
+- **E2E Tests**: Playwright for end-to-end browser testing of critical user flows
+- **Unit Tests**: Vitest for unit and integration testing of API routes and utilities
+- **Smoke Test Suite**: Covers critical paths (authentication, repository connection, task creation)
+- **Test Coverage Goals**: 
+  - MVP: Smoke tests for all critical user flows
+  - Future: Expand to cover edge cases and error scenarios
+- Browser Use for automated UI testing and screenshot capture (agent execution)
 - Agents must ensure linting passes before creating PRs
 - Prefer small, well-tested changes
-- Tests included when sensible (determined by agent context)
+- Tests run automatically on PRs via GitHub Actions
+- See `docs/TESTING.md` for detailed testing guide
 
 **Observability:**
 - Galileo tracing for observability across the entire flow

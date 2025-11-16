@@ -112,6 +112,7 @@ Pithy Jaunt follows a spec-driven development workflow using [OpenSpec](openspec
 - [Full Product Documentation](pithy_jaunt_full_docs.md) - Complete PRD, API specs, and component architecture
 - [OpenSpec Workflow](openspec/AGENTS.md) - Spec-driven development guidelines
 - [Project Conventions](openspec/project.md) - Code style, architecture patterns, and constraints
+- [Context7 MCP Setup](docs/CONTEXT7_SETUP.md) - Configure Context7 for library documentation (optional)
 
 ## 🛠️ Development Workflow
 

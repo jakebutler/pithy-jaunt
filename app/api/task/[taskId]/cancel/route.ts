@@ -74,8 +74,18 @@ export async function POST(
       );
     }
 
-    // Parse request body
-    const { terminateWorkspace: shouldTerminate } = await request.json();
+    // Parse request body (optional)
+    let shouldTerminate = false;
+    try {
+      const contentType = request.headers.get("content-type");
+      if (contentType?.includes("application/json")) {
+        const body = await request.json();
+        shouldTerminate = body.terminateWorkspace || false;
+      }
+    } catch (error) {
+      // Empty body or invalid JSON is fine, use defaults
+      console.log("[TASK CANCEL] Could not parse request body:", error);
+    }
 
     // Terminate Daytona workspace if requested and configured
     if (shouldTerminate && task.assignedWorkspaceId && isDaytonaConfigured()) {

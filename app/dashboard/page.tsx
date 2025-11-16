@@ -26,14 +26,16 @@ export default async function DashboardPage() {
   }
 
   // Fetch user's repositories
-  const repos = await convexClient.query(api.repos.getReposByUser, {
+  const reposResult = await convexClient.query(api.repos.getReposByUser, {
     userId: convexUser._id,
   });
+  const repos = Array.isArray(reposResult) ? reposResult : [];
 
   // Fetch user's tasks
-  const tasks = await convexClient.query(api.tasks.getTasksByUser, {
+  const tasksResult = await convexClient.query(api.tasks.getTasksByUser, {
     userId: convexUser._id,
   });
+  const tasks = Array.isArray(tasksResult) ? tasksResult : [];
 
   // Calculate statistics
   const stats = {
@@ -52,6 +54,19 @@ export default async function DashboardPage() {
   const recentTasks = tasks
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 5);
+
+  // Calculate task statistics per repository
+  const repoStats = repos.map((repo) => {
+    const repoTasks = tasks.filter((task) => task.repoId === repo._id);
+    return {
+      repo,
+      stats: {
+        successful: repoTasks.filter((t) => t.status === "completed").length,
+        failed: repoTasks.filter((t) => t.status === "failed").length,
+        notStarted: repoTasks.filter((t) => t.status === "queued").length,
+      },
+    };
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -231,6 +246,58 @@ export default async function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* Repository Summary */}
+          {repos.length > 0 && (
+            <div className="bg-white shadow rounded-lg mb-8">
+              <div className="px-4 py-5 sm:p-6">
+                <h2 className="text-lg font-medium text-gray-900 mb-4">
+                  Repository Summary
+                </h2>
+                {repoStats.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    No repositories connected yet.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {repoStats.map(({ repo, stats }) => (
+                      <Link
+                        key={repo._id}
+                        href={`/repos/${repo._id}`}
+                        className="block p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <h3 className="text-base font-medium text-gray-900">
+                            {repo.owner}/{repo.name}
+                          </h3>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">Successful</span>
+                            <span className="font-medium text-green-600">
+                              {stats.successful}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">Failed</span>
+                            <span className="font-medium text-red-600">
+                              {stats.failed}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">Not Started</span>
+                            <span className="font-medium text-gray-600">
+                              {stats.notStarted}
+                            </span>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Recent Tasks */}
           <div className="bg-white shadow rounded-lg mb-8">

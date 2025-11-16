@@ -27,9 +27,10 @@ export default async function TasksPage() {
   }
 
   // Fetch user's tasks
-  const tasks = await convexClient.query(api.tasks.getTasksByUser, {
+  const tasksResult = await convexClient.query(api.tasks.getTasksByUser, {
     userId: convexUser._id,
   });
+  const tasks = Array.isArray(tasksResult) ? tasksResult : [];
 
   return (
     <div className="min-h-screen bg-gray-50">

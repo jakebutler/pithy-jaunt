@@ -5,6 +5,7 @@ import { fetchRepositoryMetadata } from "@/lib/github/metadata";
 import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
 import { triggerRepositoryAnalysis } from "@/lib/coderabbit/client";
+import { sendCodeRabbitNotInstalledEmail } from "@/lib/email/sender";
 
 /**
  * POST /api/repo/connect
@@ -136,6 +137,19 @@ export async function POST(request: Request) {
       await convexClient.mutation(api.repos.updateRepoAnalysis, {
         repoId,
         analyzerStatus: "pending",
+      });
+    }
+
+    // Send email notification if CodeRabbit is not installed
+    if (!coderabbitDetected && session.user.email) {
+      // Send email asynchronously - don't block the response
+      sendCodeRabbitNotInstalledEmail({
+        to: session.user.email,
+        repoName: metadata.name,
+        userName: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
+      }).catch((error) => {
+        // Log error but don't fail the repository connection
+        console.error("Failed to send CodeRabbit email notification:", error);
       });
     }
 

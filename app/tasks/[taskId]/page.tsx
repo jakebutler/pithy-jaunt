@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { TaskLogs } from "@/components/tasks/TaskLogs";
 import { WorkspaceStatus } from "@/components/tasks/WorkspaceStatus";
+import { TaskActions } from "@/components/tasks/TaskActions";
 import Link from "next/link";
 
 export default async function TaskDetailPage({
@@ -156,51 +157,11 @@ export default async function TaskDetailPage({
           {/* Task Actions */}
           <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
-            <div className="flex gap-3">
-              {task.status === "queued" && (
-                <form action={`/api/task/${task._id}/execute`} method="POST">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    Execute Task
-                  </button>
-                </form>
-              )}
-
-              {(task.status === "queued" || task.status === "running") && (
-                <form action={`/api/task/${task._id}/cancel`} method="POST">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                  >
-                    Cancel Task
-                  </button>
-                </form>
-              )}
-
-              {task.status === "completed" && task.prUrl && (
-                <form action={`/api/task/${task._id}/approve`} method="POST">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    Approve & Merge PR
-                  </button>
-                </form>
-              )}
-
-              {task.prUrl && (
-                <a
-                  href={task.prUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                >
-                  View PR
-                </a>
-              )}
-            </div>
+            <TaskActions
+              taskId={task._id}
+              taskStatus={task.status}
+              prUrl={task.prUrl}
+            />
           </div>
 
           {/* Workspace Status */}
