@@ -55,10 +55,11 @@ jobs:
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" >> $GITHUB_ENV
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          echo "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" >> $GITHUB_PATH
 
       - name: Install Daytona CLI
         run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           brew install daytonaio/daytona/daytona
           daytona --version
 
@@ -66,6 +67,7 @@ jobs:
         env:
           DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
         run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           daytona auth login --api-key "$DAYTONA_API_KEY"
 
       - name: Create Daytona Workspace
@@ -84,6 +86,7 @@ jobs:
           WEBHOOK_URL: ${{ inputs.webhook_url }}
           KEEP_ALIVE: ${{ inputs.keep_alive }}
         run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           echo "Creating Daytona workspace..."
           echo "Snapshot: ${{ inputs.snapshot_name }}"
           echo "Repository: ${{ inputs.repo_url }}"
