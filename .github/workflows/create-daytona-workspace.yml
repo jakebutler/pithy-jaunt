@@ -68,7 +68,7 @@ jobs:
         env:
           DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
         run: |
-          daytona login --api-key "$DAYTONA_API_KEY"
+          daytona login --api-key "$DAYTONA_API_KEY" --no-interactive || echo "Login may have failed, but continuing..."
 
       - name: Create Daytona Workspace
         id: create-workspace
