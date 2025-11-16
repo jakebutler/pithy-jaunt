@@ -40,6 +40,8 @@ export async function createWorkspaceViaGitHubActions(
   if (!GITHUB_TOKEN) {
     throw new Error("GITHUB_TOKEN environment variable is required for GitHub Actions dispatch");
   }
+  // TypeScript doesn't narrow after throw, so we assert the type
+  const githubTokenString: string = GITHUB_TOKEN;
 
   const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")}/api/webhook/daytona`;
 
@@ -69,7 +71,7 @@ export async function createWorkspaceViaGitHubActions(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${GITHUB_TOKEN}`,
+          Authorization: `Bearer ${githubTokenString}`,
           Accept: "application/vnd.github.v3+json",
           "User-Agent": "PithyJaunt/1.0",
         },

@@ -82,6 +82,8 @@ export async function createWorkspace(params: {
   if (!DAYTONA_API_KEY) {
     throw new Error("DAYTONA_API_KEY environment variable is required");
   }
+  // TypeScript doesn't narrow after throw, so we assert the type
+  const apiKeyString: string = DAYTONA_API_KEY;
 
   // Use snapshot name from environment variable (defaults to "pithy-jaunt-dev")
   // This must match the snapshot name created in Daytona dashboard/CLI
@@ -119,7 +121,7 @@ export async function createWorkspace(params: {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${DAYTONA_API_KEY}`,
+        Authorization: `Bearer ${apiKeyString}`,
         "User-Agent": "PithyJaunt/1.0",
       },
       body: JSON.stringify(requestBody),
@@ -271,11 +273,13 @@ export async function getWorkspaceStatus(workspaceId: string): Promise<{
   if (!DAYTONA_API_KEY) {
     throw new Error("DAYTONA_API_KEY environment variable is required");
   }
+  // TypeScript doesn't narrow after throw, so we assert the type
+  const apiKeyString: string = DAYTONA_API_KEY;
 
   const response = await fetch(`${DAYTONA_API_URL}/workspace/${workspaceId}`, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${DAYTONA_API_KEY}`,
+      Authorization: `Bearer ${apiKeyString}`,
     },
   });
 
@@ -330,11 +334,13 @@ export async function terminateWorkspace(workspaceId: string): Promise<void> {
   if (!DAYTONA_API_KEY) {
     throw new Error("DAYTONA_API_KEY environment variable is required");
   }
+  // TypeScript doesn't narrow after throw, so we assert the type
+  const apiKeyString: string = DAYTONA_API_KEY;
 
   const response = await fetch(`${DAYTONA_API_URL}/workspace/${workspaceId}`, {
     method: "DELETE",
     headers: {
-      Authorization: `Bearer ${DAYTONA_API_KEY}`,
+      Authorization: `Bearer ${apiKeyString}`,
     },
   });
 
@@ -359,11 +365,13 @@ export async function listWorkspaces(): Promise<Array<{
   if (!DAYTONA_API_KEY) {
     throw new Error("DAYTONA_API_KEY environment variable is required");
   }
+  // TypeScript doesn't narrow after throw, so we assert the type
+  const apiKeyString: string = DAYTONA_API_KEY;
 
   const response = await fetch(`${DAYTONA_API_URL}/workspace`, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${DAYTONA_API_KEY}`,
+      Authorization: `Bearer ${apiKeyString}`,
     },
   });
 
@@ -409,11 +417,13 @@ export async function stopWorkspace(workspaceId: string): Promise<void> {
   if (!DAYTONA_API_KEY) {
     throw new Error("DAYTONA_API_KEY environment variable is required");
   }
+  // TypeScript doesn't narrow after throw, so we assert the type
+  const apiKeyString: string = DAYTONA_API_KEY;
 
   const response = await fetch(`${DAYTONA_API_URL}/workspace/${workspaceId}/stop`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${DAYTONA_API_KEY}`,
+      Authorization: `Bearer ${apiKeyString}`,
     },
   });
 

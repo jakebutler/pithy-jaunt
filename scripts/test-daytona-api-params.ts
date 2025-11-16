@@ -14,6 +14,8 @@ if (!DAYTONA_API_KEY) {
   console.error("❌ DAYTONA_API_KEY required");
   process.exit(1);
 }
+// TypeScript doesn't narrow after process.exit, so we assert the type
+const apiKeyString: string = DAYTONA_API_KEY;
 
 const testRepo = "https://github.com/jakebutler/pithy-jaunt";
 const testBranch = "main";
@@ -27,7 +29,7 @@ async function testParams(name: string, body: any) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${DAYTONA_API_KEY}`,
+        Authorization: `Bearer ${apiKeyString}`,
       },
       body: JSON.stringify(body),
     });
@@ -44,7 +46,7 @@ async function testParams(name: string, body: any) {
       const workspaceId = data.id || data.workspaceId;
       await fetch(`${DAYTONA_API_URL}/workspace/${workspaceId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${DAYTONA_API_KEY}` },
+        headers: { Authorization: `Bearer ${apiKeyString}` },
       });
       console.log(`🧹 Cleaned up workspace ${workspaceId}`);
     }
