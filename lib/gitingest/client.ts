@@ -71,87 +71,103 @@ Critical requirements:
 - Wait for processing to fully complete before extracting content`;
 
   try {
-    // Create task via Browser Use Cloud API
-    const createResponse = await fetch(`${BROWSER_USE_API_URL}/tasks`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Browser-Use-API-Key": apiKey,
-      },
-      body: JSON.stringify({
-        task: task,
-      }),
-    });
-
-    if (!createResponse.ok) {
-      const errorText = await createResponse.text();
-      throw new Error(
-        `Browser Use API error (${createResponse.status}): ${errorText}`
-      );
-    }
-
-    const taskData = await createResponse.json();
-    const taskId = taskData.id;
-
-    if (!taskId) {
-      throw new Error("Failed to get task ID from Browser Use API response");
-    }
-
-    // Poll for task completion
-    const startTime = Date.now();
     let result: any = null;
 
-    while (Date.now() - startTime < PROCESSING_TIMEOUT) {
-      // Wait before polling
-      await new Promise((resolve) => setTimeout(resolve, 3000)); // Poll every 3 seconds
-
-      const statusResponse = await fetch(
-        `${BROWSER_USE_API_URL}/tasks/${taskId}`,
-        {
-          headers: {
-            "X-Browser-Use-API-Key": apiKey,
-          },
-        }
-      );
-
-      if (!statusResponse.ok) {
-        throw new Error(
-          `Failed to check task status: ${statusResponse.statusText}`
-        );
+    // Try using SDK first if available
+    if (BrowserUseClient && typeof BrowserUseClient === "function") {
+      try {
+        const client = new BrowserUseClient({ apiKey });
+        const browserTask = await client.tasks.createTask({ task });
+        result = await browserTask.complete();
+      } catch (sdkError: any) {
+        console.log("SDK failed, falling back to REST API:", sdkError.message);
+        // Fall through to REST API
       }
-
-      result = await statusResponse.json();
-
-      // Check if task is complete
-      // Status values: "created", "started", "finished", "stopped"
-      if (result.status === "finished") {
-        break;
-      }
-
-      if (result.status === "stopped" || result.status === "failed") {
-        throw new Error(
-          result.error || result.message || "Git ingest processing was stopped"
-        );
-      }
-
-      // Check if we have output even if status is still "started"
-      // Sometimes tasks complete but status hasn't updated yet
-      if (result.status === "started" && result.output) {
-        const outputContent = typeof result.output === "string" 
-          ? result.output 
-          : JSON.stringify(result.output);
-        // If we have substantial output, the task might be done
-        if (outputContent.length > 1000) {
-          console.log("Task appears complete (has output), breaking early");
-          break;
-        }
-      }
-
-      // Continue polling if still running (created or started)
     }
 
-    if (!result || result.status !== "finished") {
-      throw new Error("Git ingest processing timed out after 10 minutes");
+    // Use REST API if SDK not available or failed
+    if (!result) {
+      // Create task via Browser Use Cloud API
+      const createResponse = await fetch(`${BROWSER_USE_API_URL}/tasks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Browser-Use-API-Key": apiKey,
+        },
+        body: JSON.stringify({
+          task: task,
+        }),
+      });
+
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text();
+        throw new Error(
+          `Browser Use API error (${createResponse.status}): ${errorText}`
+        );
+      }
+
+      const taskData = await createResponse.json();
+      const taskId = taskData.id;
+
+      if (!taskId) {
+        throw new Error("Failed to get task ID from Browser Use API response");
+      }
+
+      // Poll for task completion
+      const startTime = Date.now();
+
+      while (Date.now() - startTime < PROCESSING_TIMEOUT) {
+        // Wait before polling
+        await new Promise((resolve) => setTimeout(resolve, 3000)); // Poll every 3 seconds
+
+        const statusResponse = await fetch(
+          `${BROWSER_USE_API_URL}/tasks/${taskId}`,
+          {
+            headers: {
+              "X-Browser-Use-API-Key": apiKey,
+            },
+          }
+        );
+
+        if (!statusResponse.ok) {
+          throw new Error(
+            `Failed to check task status: ${statusResponse.statusText}`
+          );
+        }
+
+        result = await statusResponse.json();
+
+        // Check if task is complete
+        // Status values: "created", "started", "finished", "stopped"
+        if (result.status === "finished") {
+          break;
+        }
+
+        if (result.status === "stopped" || result.status === "failed") {
+          throw new Error(
+            result.error || result.message || "Git ingest processing was stopped"
+          );
+        }
+
+        // Check if we have output even if status is still "started"
+        // Sometimes tasks complete but status hasn't updated yet
+        if (result.status === "started" && result.output) {
+          const outputContent = typeof result.output === "string" 
+            ? result.output 
+            : JSON.stringify(result.output);
+          // If we have substantial output, the task might be done
+          if (outputContent.length > 1000) {
+            console.log("Task appears complete (has output), breaking early");
+            break;
+          }
+        }
+
+        // Continue polling if still running (created or started)
+      }
+
+      if (!result || (result.status !== "finished" && !(result.status === "started" && result.output))) {
+        throw new Error("Git ingest processing timed out after 10 minutes");
+      }
     }
 
     // Extract content from the result
