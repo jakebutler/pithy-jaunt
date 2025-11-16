@@ -53,7 +53,8 @@ jobs:
     steps:
       - name: Install Daytona CLI
         run: |
-          curl -fsSL https://download.daytona.io/daytona/install.sh | sh
+          # Download and install Daytona CLI
+          curl -fsSL https://download.daytona.io/cli/latest/install.sh | bash
           echo "$HOME/.daytona/bin" >> $GITHUB_PATH
           # Add to PATH for current step
           export PATH="$HOME/.daytona/bin:$PATH"
