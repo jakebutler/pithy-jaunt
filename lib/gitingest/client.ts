@@ -457,13 +457,26 @@ export async function processGitIngest(
 export async function processGitIngestWithRetry(
   repoUrl: string,
   useCloud: boolean = true,
-  maxRetries: number = 1
+  maxRetries: number = 2
 ): Promise<string> {
   let lastError: Error | null = null;
+  let lastContent: string | null = null;
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await processGitIngest(repoUrl, useCloud);
+      const content = await processGitIngest(repoUrl, useCloud);
+      
+      // If we got content but it's very short (< 5000 chars), it might be truncated
+      // Retry to try to get full content
+      if (content.length < 5000 && attempt < maxRetries) {
+        console.log(`Content seems truncated (${content.length} chars), retrying...`);
+        lastContent = content; // Keep as fallback
+        // Wait before retry
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        continue;
+      }
+      
+      return content;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       
@@ -473,13 +486,25 @@ export async function processGitIngestWithRetry(
         lastError.message.includes("invalid") ||
         attempt >= maxRetries
       ) {
+        // If we have partial content from a previous attempt, return it
+        if (lastContent && lastContent.length > 100) {
+          console.log(`Returning partial content from previous attempt (${lastContent.length} chars)`);
+          return lastContent;
+        }
         throw lastError;
       }
       
       // Wait before retry (exponential backoff)
-      const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+      const delay = Math.min(5000 * Math.pow(2, attempt), 30000);
+      console.log(`Retrying git ingest (attempt ${attempt + 1}/${maxRetries + 1}) after ${delay}ms...`);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
+  }
+  
+  // If we have partial content, return it
+  if (lastContent && lastContent.length > 100) {
+    console.log(`Returning partial content as fallback (${lastContent.length} chars)`);
+    return lastContent;
   }
   
   throw lastError || new Error("Git ingest processing failed after retries");
