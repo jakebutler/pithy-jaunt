@@ -57,25 +57,11 @@ jobs:
           DAYTONA_VERSION=$(curl -s https://api.github.com/repos/daytonaio/daytona/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
           echo "Installing Daytona CLI version: $DAYTONA_VERSION"
           
-          # Try different possible release formats
-          # First, try tar.gz format
-          if curl -L -f -o /tmp/daytona.tar.gz "https://github.com/daytonaio/daytona/releases/download/${DAYTONA_VERSION}/daytona-linux-amd64.tar.gz" 2>/dev/null; then
-            tar -xzf /tmp/daytona.tar.gz -C /tmp
-            sudo mv /tmp/daytona /usr/local/bin/daytona
-          # If that fails, try direct binary download
-          elif curl -L -f -o /tmp/daytona "https://github.com/daytonaio/daytona/releases/download/${DAYTONA_VERSION}/daytona-linux-amd64" 2>/dev/null; then
-            sudo mv /tmp/daytona /usr/local/bin/daytona
-          # If that fails, try with .tar extension
-          elif curl -L -f -o /tmp/daytona.tar "https://github.com/daytonaio/daytona/releases/download/${DAYTONA_VERSION}/daytona-linux-amd64.tar" 2>/dev/null; then
-            tar -xf /tmp/daytona.tar -C /tmp
-            sudo mv /tmp/daytona /usr/local/bin/daytona
-          else
-            echo "Error: Could not download Daytona CLI. Checking available assets..."
-            curl -s https://api.github.com/repos/daytonaio/daytona/releases/latest | grep '"browser_download_url"' | head -5
-            exit 1
-          fi
-          
+          # Download direct binary (no archive, just the binary)
+          curl -L -o /tmp/daytona "https://github.com/daytonaio/daytona/releases/download/${DAYTONA_VERSION}/daytona-linux-amd64"
+          sudo mv /tmp/daytona /usr/local/bin/daytona
           sudo chmod +x /usr/local/bin/daytona
+          
           daytona --version
 
       - name: Authenticate with Daytona
