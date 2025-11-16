@@ -53,11 +53,8 @@ jobs:
     steps:
       - name: Install Daytona CLI
         run: |
-          # Download and install Daytona CLI
-          curl -fsSL https://download.daytona.io/cli/latest/install.sh | bash
-          echo "$HOME/.daytona/bin" >> $GITHUB_PATH
-          # Add to PATH for current step
-          export PATH="$HOME/.daytona/bin:$PATH"
+          # Install Daytona CLI using Homebrew
+          brew install daytonaio/daytona/daytona
           daytona --version
 
       - name: Authenticate with Daytona
