@@ -36,29 +36,30 @@ async function processWithBrowserUseCloud(repoUrl: string): Promise<string> {
   }
 
   // Task description for the browser agent
-  const task = `Navigate to https://gitingest.com/ and process the repository ${repoUrl}.
+  // Make it more explicit and actionable
+  const task = `Go to https://gitingest.com/ and generate a digest for the repository: ${repoUrl}
 
-Steps:
-1. Go to https://gitingest.com/
-2. Find the input field for the repository URL (it may be a text input or textarea)
-3. Enter or paste the repository URL: ${repoUrl}
-4. Submit the form or click the process/analyze button
-5. Wait for the processing to complete (this may take 30-60 seconds for large repos)
-   - Look for indicators like "Processing...", "Analyzing...", or progress bars
-   - Wait until you see the results or a download button appears
-6. Once processing is complete, look for the digest content on the page
-   - The content may be displayed directly on the page in a textarea or pre tag
-   - Or there may be a download button/link to get the file
-7. If content is on the page, copy all the text content from the textarea/pre element
-8. If there's a download button, click it and wait for the download, then read the file
-9. Return the FULL, COMPLETE content as text - do not summarize or truncate
+Your goal is to extract the complete codebase digest text from GitIngest.com.
 
-Important:
-- Wait patiently for processing to complete - this can take time
-- The digest content should be substantial (thousands of lines for most repos)
-- Return the complete, unmodified content
-- Look for elements with IDs like "result-summary", "directory-structure", or similar
-- Make sure to get ALL the content, not just a preview`;
+Step-by-step instructions:
+1. Navigate to https://gitingest.com/
+2. Find the URL input field on the page (it should be visible on the main page)
+3. Enter this exact repository URL: ${repoUrl}
+4. Click the submit/process button (may be labeled "Ingest", "Process", "Generate", or similar)
+5. Wait for processing to complete - you'll see a loading indicator or "Processing..." message
+6. Once processing finishes, the digest content will appear on the page
+7. Find the digest text content - it may be in:
+   - A textarea element (look for id="result-summary" or similar)
+   - A pre or code element showing the formatted digest
+   - Multiple sections showing repository summary, directory structure, and file contents
+8. Extract ALL the text content from these elements
+9. Return the complete, unmodified digest text - it should be thousands of lines long
+
+Critical requirements:
+- Do NOT summarize or truncate the content
+- Return the FULL digest including repository summary, directory structure, and all file contents
+- The content should start with "Repository:" and contain "Directory structure:" and "FILE:" markers
+- Wait for processing to fully complete before extracting content`;
 
   try {
     // Create task via Browser Use Cloud API
