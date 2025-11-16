@@ -23,6 +23,15 @@ const PYTHON_SCRIPT_PATH = path.join(
 const BROWSER_USE_API_URL = "https://api.browser-use.com/api/v2";
 const PROCESSING_TIMEOUT = 10 * 60 * 1000; // 10 minutes (GitIngest can take a while for large repos)
 
+// Try to use Browser Use SDK if available
+let BrowserUseClient: any = null;
+try {
+  const sdk = require("browser-use-sdk");
+  BrowserUseClient = sdk.BrowserUseClient || sdk.default?.BrowserUseClient || sdk;
+} catch {
+  // SDK not available, will use REST API
+}
+
 /**
  * Process a repository through GitIngest using Browser Use Cloud API
  * This automates the GitIngest.com web interface to extract digest content
