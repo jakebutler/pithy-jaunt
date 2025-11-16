@@ -1,0 +1,30 @@
+{
+  "name": "pithy-jaunt-dev",
+  "title": "Pithy Jaunt Development Environment",
+  "description": "Template for executing AI agent tasks in isolated Daytona workspaces",
+  "image": "pithy-jaunt/daytona:latest",
+  "timeout_minutes": 25,
+  "init": [
+    "/app/execution.sh"
+  ],
+  "env": {
+    "TARGET_REPO": "",
+    "BRANCH_NAME": "",
+    "TASK_ID": "",
+    "AGENT_PROMPT": "",
+    "OPENAI_API_KEY": "",
+    "ANTHROPIC_API_KEY": "",
+    "GITHUB_TOKEN": "",
+    "MODEL_PROVIDER": "openai",
+    "MODEL": "gpt-4o",
+    "WEBHOOK_URL": "",
+    "KEEP_ALIVE": "false"
+  },
+  "features": {
+    "git": true,
+    "github_cli": true,
+    "python": true,
+    "node": true
+  }
+}
+

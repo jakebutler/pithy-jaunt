@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { CodeRabbitReport } from "@/components/repos/CodeRabbitReport";
 import Link from "next/link";
+import { ExternalLink } from "@/components/ui/ExternalLink";
 
 export default async function RepoDetailPage({
   params,
@@ -156,13 +157,15 @@ export default async function RepoDetailPage({
             ) : (
               <div className="space-y-3">
                 {tasks.map((task) => (
-                  <Link
+                  <div
                     key={task._id}
-                    href={`/tasks/${task._id}`}
-                    className="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
+                    className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
                   >
                     <div className="flex items-start justify-between">
-                      <div className="flex-1">
+                      <Link
+                        href={`/tasks/${task._id}`}
+                        className="flex-1 block"
+                      >
                         <h3 className="font-medium text-gray-900">{task.title}</h3>
                         <p className="text-sm text-gray-600 mt-1 line-clamp-2">
                           {task.description}
@@ -178,20 +181,17 @@ export default async function RepoDetailPage({
                             </>
                           )}
                         </div>
-                      </div>
+                      </Link>
                       {task.prUrl && (
-                        <a
+                        <ExternalLink
                           href={task.prUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           className="ml-4 text-sm text-blue-600 hover:text-blue-800"
-                          onClick={(e) => e.stopPropagation()}
                         >
                           View PR
-                        </a>
+                        </ExternalLink>
                       )}
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             )}

@@ -23,6 +23,7 @@ export async function createWorkspace(params: {
   taskDescription: string;
   modelProvider: "openai" | "anthropic";
   model: string;
+  keepWorkspaceAlive?: boolean;
 }): Promise<{
   workspaceId: string;
   status: "creating" | "running";
@@ -35,6 +36,7 @@ export async function createWorkspace(params: {
     url: `${DAYTONA_API_URL}/workspace`,
     hasApiKey: !!DAYTONA_API_KEY,
     apiKeyLength: DAYTONA_API_KEY?.length || 0,
+    snapshot: "butlerjake/pithy-jaunt-daytona:v1.0.0",
     template: "pithy-jaunt-dev",
     repoUrl: params.repoUrl,
     branch: params.branch,
@@ -48,6 +50,10 @@ export async function createWorkspace(params: {
       "User-Agent": "PithyJaunt/1.0",
     },
     body: JSON.stringify({
+      // Daytona requires snapshots to be created in the dashboard first
+      // Try snapshot name first (matches image name)
+      snapshot: "butlerjake/pithy-jaunt-daytona:v1.0.0",
+      // Also try template name as fallback
       template: "pithy-jaunt-dev",
       repoUrl: params.repoUrl,
       branch: params.branch,
@@ -62,6 +68,7 @@ export async function createWorkspace(params: {
         MODEL_PROVIDER: params.modelProvider,
         MODEL: params.model,
         WEBHOOK_URL: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/webhook/daytona`,
+        KEEP_ALIVE: params.keepWorkspaceAlive ? "true" : "false",
       },
     }),
   });

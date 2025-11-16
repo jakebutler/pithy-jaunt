@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { createGitHubClient } from "@/lib/github/client";
 
 /**
  * POST /api/webhook/daytona
@@ -26,6 +25,12 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
+    console.log("[Daytona Webhook] Received webhook:", {
+      type: body.type,
+      taskId: body.taskId,
+      workspaceId: body.workspaceId,
+    });
+
     // Handle workspace status updates
     if (body.type === "workspace.status") {
       const { workspaceId, status } = body;
@@ -48,25 +53,55 @@ export async function POST(request: Request) {
     if (body.type === "task.completed") {
       const { workspaceId, taskId, branchName, prUrl, status } = body;
 
-      // Find workspace
-      const workspace = await convexClient.query(
-        api.workspaces.getWorkspaceByDaytonaId,
-        { daytonaId: workspaceId }
-      );
+      console.log("[Daytona Webhook] Task completed:", {
+        taskId,
+        workspaceId,
+        prUrl,
+        status,
+      });
 
-      if (workspace && workspace.assignedTasks.includes(taskId as Id<"tasks">)) {
-        // Update task with results
-        await convexClient.mutation(api.tasks.updateTaskWorkspace, {
-          taskId: taskId as Id<"tasks">,
-          branchName,
-          prUrl,
-        });
+      // Get task directly (workspace might not exist yet)
+      const task = await convexClient.query(api.tasks.getTaskById, {
+        taskId: taskId as Id<"tasks">,
+      });
 
-        // Update task status
-        await convexClient.mutation(api.tasks.updateTaskStatus, {
-          taskId: taskId as Id<"tasks">,
-          status: status === "success" ? "completed" : "failed",
-        });
+      if (!task) {
+        console.warn("[Daytona Webhook] Task not found:", taskId);
+        return NextResponse.json(
+          { error: "Task not found" },
+          { status: 404 }
+        );
+      }
+
+      // Update task with results
+      await convexClient.mutation(api.tasks.updateTaskWorkspace, {
+        taskId: task._id,
+        branchName: branchName || undefined,
+        prUrl: prUrl || undefined,
+      });
+
+      // Update task status
+      await convexClient.mutation(api.tasks.updateTaskStatus, {
+        taskId: task._id,
+        status: status === "success" ? "completed" : "failed",
+      });
+
+      // Update workspace if it exists
+      try {
+        const workspace = await convexClient.query(
+          api.workspaces.getWorkspaceByDaytonaId,
+          { daytonaId: workspaceId || task.assignedWorkspaceId || "" }
+        );
+
+        if (workspace) {
+          await convexClient.mutation(api.workspaces.updateWorkspaceStatus, {
+            workspaceId: workspace._id,
+            status: "stopped",
+          });
+        }
+      } catch (error) {
+        // Workspace might not exist, that's okay
+        console.log("[Daytona Webhook] Workspace not found (non-critical):", error);
       }
     }
 
@@ -98,20 +133,69 @@ export async function POST(request: Request) {
 
     // Handle execution failure
     if (body.type === "task.failed") {
-      const { workspaceId, taskId, error } = body;
+      const { workspaceId, taskId, error, status } = body;
 
-      // Find workspace
-      const workspace = await convexClient.query(
-        api.workspaces.getWorkspaceByDaytonaId,
-        { daytonaId: workspaceId }
-      );
+      console.log("[Daytona Webhook] Task failed:", {
+        taskId,
+        workspaceId,
+        error,
+      });
 
-      if (workspace && workspace.assignedTasks.includes(taskId as Id<"tasks">)) {
-        // Update task status to failed
-        await convexClient.mutation(api.tasks.updateTaskStatus, {
-          taskId: taskId as Id<"tasks">,
+      // Get task directly
+      const task = await convexClient.query(api.tasks.getTaskById, {
+        taskId: taskId as Id<"tasks">,
+      });
+
+      if (!task) {
+        console.warn("[Daytona Webhook] Task not found:", taskId);
+        return NextResponse.json(
+          { error: "Task not found" },
+          { status: 404 }
+        );
+      }
+
+      // Determine if it's a patch failure (needs_review) or other failure
+      const errorMessage = error || "";
+      const isPatchFailure =
+        errorMessage.includes("patch") ||
+        errorMessage.includes("apply") ||
+        errorMessage.includes("conflict");
+
+      // Update task status
+      await convexClient.mutation(api.tasks.updateTaskStatus, {
+        taskId: task._id,
+        status: isPatchFailure ? "needs_review" : "failed",
+      });
+
+      // Store error in execution logs if available
+      try {
+        // @ts-expect-error - executionLogs will be available after Convex regenerates types
+        await convexClient.mutation(api.executionLogs.createLog, {
+          taskId: task._id,
+          workspaceId: workspaceId || task.assignedWorkspaceId || "",
+          logs: `Error: ${errorMessage}`,
           status: "failed",
+          error: errorMessage,
         });
+      } catch (logError) {
+        console.warn("[Daytona Webhook] Failed to store error logs:", logError);
+      }
+
+      // Update workspace status if it exists
+      try {
+        const workspace = await convexClient.query(
+          api.workspaces.getWorkspaceByDaytonaId,
+          { daytonaId: workspaceId || task.assignedWorkspaceId || "" }
+        );
+
+        if (workspace) {
+          await convexClient.mutation(api.workspaces.updateWorkspaceStatus, {
+            workspaceId: workspace._id,
+            status: "stopped",
+          });
+        }
+      } catch (error) {
+        console.log("[Daytona Webhook] Workspace not found (non-critical):", error);
       }
     }
 

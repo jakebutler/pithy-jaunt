@@ -1,0 +1,10 @@
+# Ignore files that shouldn't be in Docker image
+README.md
+*.md
+.git
+.gitignore
+node_modules
+.env
+.env.local
+*.log
+

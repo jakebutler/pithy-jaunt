@@ -87,5 +87,21 @@ export default defineSchema({
   })
     .index("by_daytona_id", ["daytonaId"])
     .index("by_status", ["status"]),
+
+  // Execution logs from task execution
+  executionLogs: defineTable({
+    taskId: v.id("tasks"),
+    workspaceId: v.string(), // GitHub Actions run ID or Daytona workspace ID
+    logs: v.string(), // Execution logs (can be large)
+    status: v.union(
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    error: v.optional(v.string()), // Error message if failed
+    createdAt: v.number(),
+  })
+    .index("by_task", ["taskId"])
+    .index("by_workspace", ["workspaceId"]),
 });
 

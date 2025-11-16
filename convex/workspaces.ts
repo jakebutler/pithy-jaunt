@@ -98,3 +98,19 @@ export const assignTaskToWorkspace = mutation({
   },
 });
 
+/**
+ * Delete all workspaces
+ */
+export const deleteAllWorkspaces = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const workspaces = await ctx.db.query("workspaces").collect();
+
+    for (const workspace of workspaces) {
+      await ctx.db.delete(workspace._id);
+    }
+
+    return { deleted: workspaces.length };
+  },
+});
+

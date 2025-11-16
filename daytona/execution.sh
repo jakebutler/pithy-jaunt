@@ -2,20 +2,119 @@
 set -euo pipefail
 export PATH=$PATH:/usr/local/bin
 
-echo "[pj] starting execution for $TASK_ID"
+# Function to send webhook
+send_webhook() {
+  local type=$1
+  local status=$2
+  local error_msg=${3:-""}
+  local pr_url=${4:-""}
+  
+  if [ -z "$WEBHOOK_URL" ]; then
+    echo "[pj] Warning: WEBHOOK_URL not set, skipping webhook"
+    return
+  fi
+  
+  local payload=$(cat <<EOF
+{
+  "type": "$type",
+  "taskId": "$TASK_ID",
+  "workspaceId": "${WORKSPACE_ID:-unknown}",
+  "branchName": "${BRANCH_NAME:-}",
+  "prUrl": "$pr_url",
+  "status": "$status",
+  "error": "$error_msg"
+}
+EOF
+)
+  
+  echo "[pj] Sending webhook: $type"
+  curl -X POST "$WEBHOOK_URL" \
+    -H "Content-Type: application/json" \
+    -d "$payload" \
+    --max-time 10 \
+    --silent \
+    --show-error || echo "[pj] Warning: Webhook delivery failed"
+}
+
+# Function to handle errors
+handle_error() {
+  local error_msg=$1
+  echo "[pj] Error: $error_msg" >&2
+  send_webhook "task.failed" "failed" "$error_msg"
+  exit 1
+}
+
+# Trap errors
+trap 'handle_error "Script failed at line $LINENO"' ERR
+
+echo "[pj] ========================================"
+echo "[pj] Starting execution for task: $TASK_ID"
+echo "[pj] ========================================"
+echo "[pj] Target repo: $TARGET_REPO"
+echo "[pj] Branch name: ${BRANCH_NAME:-pj/${TASK_ID}}"
+echo "[pj] Model provider: ${MODEL_PROVIDER:-openai}"
+echo "[pj] Model: ${MODEL:-gpt-4o}"
+
+# Validate required environment variables
+if [ -z "$TARGET_REPO" ]; then
+  handle_error "TARGET_REPO environment variable is required"
+fi
+
+if [ -z "$TASK_ID" ]; then
+  handle_error "TASK_ID environment variable is required"
+fi
+
+if [ -z "$AGENT_PROMPT" ]; then
+  handle_error "AGENT_PROMPT environment variable is required"
+fi
+
+# Configure git
+git config --global user.name "Pithy Jaunt Bot"
+git config --global user.email "bot@pithy-jaunt.dev"
+
+# Configure GitHub CLI if token is provided
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+  echo "$GITHUB_TOKEN" | gh auth login --with-token
+  echo "[pj] GitHub CLI authenticated"
+fi
+
+# Create working directory
 mkdir -p /tmp/pj
 cd /tmp/pj
 
-echo "cloning $TARGET_REPO"
-git clone "$TARGET_REPO" repo
+# Clone repository
+echo "[pj] Cloning repository: $TARGET_REPO"
+if ! git clone "$TARGET_REPO" repo; then
+  handle_error "Failed to clone repository: $TARGET_REPO"
+fi
+
 cd repo
 
-# create branch
+# Determine base branch (default to main)
+BASE_BRANCH=${BASE_BRANCH:-main}
+if ! git show-ref --verify --quiet refs/heads/"$BASE_BRANCH"; then
+  # Try master if main doesn't exist
+  if git show-ref --verify --quiet refs/heads/master; then
+    BASE_BRANCH=master
+  else
+    # Use the default branch
+    BASE_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+  fi
+fi
+
+echo "[pj] Base branch: $BASE_BRANCH"
+git checkout "$BASE_BRANCH"
+
+# Create branch
 BRANCH=${BRANCH_NAME:-pj/${TASK_ID}}
-git checkout -b "$BRANCH"
+echo "[pj] Creating branch: $BRANCH"
+if ! git checkout -b "$BRANCH"; then
+  # Branch might already exist, try to delete and recreate
+  git branch -D "$BRANCH" 2>/dev/null || true
+  git checkout -b "$BRANCH"
+fi
 
 # Add CodeRabbit configuration if missing
-# This enables CodeRabbit to automatically analyze the repository
 if [ ! -f .coderabbit.yaml ]; then
   echo "[pj] Adding CodeRabbit configuration..."
   
@@ -48,45 +147,113 @@ output:
   include_code_examples: true
 EOF
 
-  # Commit the config
   git add .coderabbit.yaml
-  git commit -m "Add CodeRabbit configuration (Pithy Jaunt)"
+  git commit -m "Add CodeRabbit configuration (Pithy Jaunt)" || true
   
   echo "[pj] CodeRabbit configuration added"
-  echo "[pj] CodeRabbit will automatically start analyzing when this PR is created"
 fi
 
-# run language agent
-python3 /app/runner.py --prompt-file /app/system-prompt.md --task "$AGENT_PROMPT" --out /tmp/patch.diff
+# Run AI agent to generate patch
+echo "[pj] Running AI agent to generate code changes..."
+echo "[pj] Task description: $AGENT_PROMPT"
 
-# apply patch
-if git apply /tmp/patch.diff; then
-  git add -A
-  git commit -m "Pithy Jaunt automated change: $TASK_ID"
-  git push origin "$BRANCH"
-  # create PR using gh CLI
-  gh pr create --title "Pithy Jaunt: $TASK_ID" --body "Automated change for task $TASK_ID" --base main --head "$BRANCH"
-  echo "PR created"
-  
-  # CodeRabbit will automatically review the PR and post comments
-  # Our webhook will receive those comments and create tasks
+if ! python3 /app/agent-runner.py \
+  --prompt-file /app/system-prompt.md \
+  --task "$AGENT_PROMPT" \
+  --repo-path "$(pwd)" \
+  --out /tmp/patch.diff \
+  --provider "${MODEL_PROVIDER:-openai}" \
+  --model "${MODEL:-gpt-4o}"; then
+  handle_error "AI agent failed to generate patch"
+fi
+
+# Check if patch file exists and is not empty
+if [ ! -f /tmp/patch.diff ] || [ ! -s /tmp/patch.diff ]; then
+  handle_error "Patch file is empty or missing"
+fi
+
+echo "[pj] Patch generated successfully"
+echo "[pj] Patch size: $(wc -l < /tmp/patch.diff) lines"
+
+# Apply patch
+echo "[pj] Applying patch..."
+if ! git apply /tmp/patch.diff; then
+  handle_error "Failed to apply patch. The patch may be invalid or conflict with existing code."
+fi
+
+echo "[pj] Patch applied successfully"
+
+# Commit changes
+git add -A
+if ! git diff --cached --quiet; then
+  git commit -m "Pithy Jaunt: $TASK_ID" || handle_error "Failed to commit changes"
+  echo "[pj] Changes committed"
 else
-  echo "Patch failed to apply" >&2
-  exit 2
+  echo "[pj] No changes to commit"
 fi
 
-# run Browser Use tests if browser-use config present
+# Push branch
+echo "[pj] Pushing branch to remote..."
+if ! git push origin "$BRANCH"; then
+  handle_error "Failed to push branch to remote"
+fi
+
+echo "[pj] Branch pushed successfully"
+
+# Create PR using GitHub CLI
+echo "[pj] Creating pull request..."
+PR_BODY="Automated change for task $TASK_ID
+
+**Task Description:**
+$AGENT_PROMPT
+
+**Generated by:** Pithy Jaunt AI Agent
+**Model:** ${MODEL_PROVIDER:-openai}/${MODEL:-gpt-4o}
+"
+
+PR_URL=""
+if PR_OUTPUT=$(gh pr create \
+  --title "Pithy Jaunt: $TASK_ID" \
+  --body "$PR_BODY" \
+  --base "$BASE_BRANCH" \
+  --head "$BRANCH" \
+  2>&1); then
+  # Extract PR URL from output
+  PR_URL=$(echo "$PR_OUTPUT" | grep -o 'https://github.com/[^ ]*' | head -1)
+  echo "[pj] Pull request created: $PR_URL"
+else
+  # Check if PR already exists
+  if echo "$PR_OUTPUT" | grep -q "already exists"; then
+    PR_URL=$(gh pr view "$BRANCH" --json url --jq '.url' 2>/dev/null || echo "")
+    echo "[pj] Pull request already exists: $PR_URL"
+  else
+    handle_error "Failed to create pull request: $PR_OUTPUT"
+  fi
+fi
+
+# Run Browser Use tests if config present (optional)
 if [ -f .browseruse.yml ]; then
-  echo "running Browser Use tests"
-  browser-use run --config .browseruse.yml --save-screenshots /tmp/screens
-  # attach screenshots to the PR (upload flow or use GitHub API to attach)
+  echo "[pj] Running Browser Use tests..."
+  if command -v browser-use &> /dev/null; then
+    browser-use run --config .browseruse.yml --save-screenshots /tmp/screens || echo "[pj] Browser Use tests failed (non-critical)"
+  else
+    echo "[pj] Browser Use not installed, skipping tests"
+  fi
 fi
 
-# optionally keep workspace alive until user closes
+# Send success webhook
+send_webhook "task.completed" "success" "" "$PR_URL"
+
+echo "[pj] ========================================"
+echo "[pj] Execution completed successfully!"
+echo "[pj] PR URL: $PR_URL"
+echo "[pj] ========================================"
+
+# Optionally keep workspace alive for debugging
 if [ "${KEEP_ALIVE:-false}" = "true" ]; then
-  echo "keeping workspace alive for interactive debugging"
+  echo "[pj] Keeping workspace alive for interactive debugging (15 minutes)..."
   sleep 900
 fi
 
-echo "execution complete"
+echo "[pj] Execution complete"
 

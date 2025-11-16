@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ExternalLink } from "@/components/ui/ExternalLink";
 
 interface TaskCardProps {
   taskId: string;
@@ -103,12 +104,9 @@ export function TaskCard({
   }
 
   return (
-    <Link
-      href={`/tasks/${taskId}`}
-      className="block p-6 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
-    >
+    <div className="block p-6 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
+        <Link href={`/tasks/${taskId}`} className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
             <h3 className="text-lg font-semibold text-gray-900 truncate">
               {title}
@@ -128,36 +126,35 @@ export function TaskCard({
             {initiator === "coderabbit" && (
               <span className="text-purple-600">From CodeRabbit</span>
             )}
-            {prUrl && (
-              <a
-                href={prUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800"
-                onClick={(e) => e.stopPropagation()}
-              >
-                View PR
-              </a>
-            )}
           </div>
-        </div>
+        </Link>
 
-        <svg
-          className="w-5 h-5 text-gray-400 flex-shrink-0"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 5l7 7-7 7"
-          />
-        </svg>
+        <div className="flex items-center gap-2">
+          {prUrl && (
+            <ExternalLink
+              href={prUrl}
+              className="text-blue-600 hover:text-blue-800 text-xs"
+            >
+              View PR
+            </ExternalLink>
+          )}
+          <svg
+            className="w-5 h-5 text-gray-400 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }
 

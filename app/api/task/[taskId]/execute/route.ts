@@ -195,6 +195,7 @@ export async function POST(
         taskDescription: task.description,
         modelProvider: task.modelPreference.provider,
         model: task.modelPreference.model,
+        keepWorkspaceAlive: keepWorkspaceAlive,
       });
 
       // Create workspace record in Convex

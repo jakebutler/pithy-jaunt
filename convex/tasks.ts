@@ -133,3 +133,52 @@ export const updateTaskWorkspace = mutation({
   },
 });
 
+/**
+ * Delete a task
+ */
+export const deleteTask = mutation({
+  args: {
+    taskId: v.id("tasks"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.taskId);
+  },
+});
+
+/**
+ * Delete all tasks for a user
+ */
+export const deleteAllTasksForUser = mutation({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    for (const task of tasks) {
+      await ctx.db.delete(task._id);
+    }
+
+    return { deleted: tasks.length };
+  },
+});
+
+/**
+ * Delete ALL tasks (admin only - for development)
+ */
+export const deleteAllTasks = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const tasks = await ctx.db.query("tasks").collect();
+
+    for (const task of tasks) {
+      await ctx.db.delete(task._id);
+    }
+
+    return { deleted: tasks.length };
+  },
+});
+
