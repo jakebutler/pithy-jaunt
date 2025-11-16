@@ -96,12 +96,15 @@ SPECIFIC INSTRUCTIONS:
 5. If you see "Processing..." or "Loading..." text, wait patiently (up to 120 seconds total)
 6. Once textareas are detected (document.querySelectorAll('textarea').length > 0), extract content:
    - Execute: const textareas = Array.from(document.querySelectorAll('textarea'));
-   - Get values: textareas.map(ta => ta.value).filter(v => v.length > 100)
-   - Combine: textareas.map(ta => ta.value).filter(v => v.length > 100).join('\\n\\n')
-7. Also try clicking the "Copy all" button if it exists:
+   - Get ALL values: textareas.map(ta => ta.value) (do not filter - get everything)
+   - Combine ALL textarea content: textareas.map(ta => ta.value).join('\\n\\n')
+   - Scroll to bottom of page if needed to ensure all content is loaded
+7. Click the "Copy all" button to get complete content:
    - Find: document.querySelector('button[onclick*=\"copyFullDigest\"]')
-   - Click it, then try: navigator.clipboard.readText()
-8. Use whichever method gives you the most complete content
+   - Click it to copy all content to clipboard
+   - Then read from clipboard: navigator.clipboard.readText()
+8. If there's a "Download" button, click it to get the full file (optional)
+9. Use the clipboard content if available (from "Copy all"), otherwise use textarea extraction
 9. Verify the extracted content:
    - Should start with "Repository: [owner]/[repo]"
    - Should contain "Directory structure:" section
