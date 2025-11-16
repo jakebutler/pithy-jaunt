@@ -20,6 +20,7 @@
 const DAYTONA_API_URL = process.env.DAYTONA_API_URL || "http://localhost:3001";
 const DAYTONA_API_KEY = process.env.DAYTONA_API_KEY;
 const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "pithy-jaunt-dev";
+const USE_SDK = process.env.DAYTONA_USE_SDK !== "false"; // Default to true, can be disabled
 const USE_CLI_FALLBACK = process.env.DAYTONA_USE_CLI_FALLBACK === "true";
 const USE_GITHUB_ACTIONS = process.env.DAYTONA_USE_GITHUB_ACTIONS === "true";
 
@@ -38,7 +39,24 @@ export async function createWorkspace(params: {
   workspaceId: string;
   status: "creating" | "running";
 }> {
-  // If GitHub Actions is enabled, use it directly (bypasses REST API issues)
+  // Use TypeScript SDK by default (simplest and most reliable)
+  if (USE_SDK) {
+    console.log("[Daytona] Using TypeScript SDK to create workspace");
+    const { createWorkspaceViaSDK, isSDKAvailable } = await import("./sdk-client");
+    
+    if (!isSDKAvailable()) {
+      throw new Error("DAYTONA_API_KEY environment variable is required for SDK");
+    }
+    
+    try {
+      return await createWorkspaceViaSDK(params);
+    } catch (error: any) {
+      console.warn("[Daytona] SDK failed, falling back to REST API:", error.message);
+      // Fall through to REST API
+    }
+  }
+
+  // If GitHub Actions is enabled, use it (bypasses REST API issues)
   if (USE_GITHUB_ACTIONS) {
     console.log("[Daytona] Using GitHub Actions to create workspace");
     const { createWorkspaceViaGitHubActions, isGitHubActionsAvailable } = await import("./github-actions-client");
