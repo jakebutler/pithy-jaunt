@@ -118,10 +118,23 @@ Important:
         break;
       }
 
-      if (result.status === "stopped") {
+      if (result.status === "stopped" || result.status === "failed") {
         throw new Error(
           result.error || result.message || "Git ingest processing was stopped"
         );
+      }
+
+      // Check if we have output even if status is still "started"
+      // Sometimes tasks complete but status hasn't updated yet
+      if (result.status === "started" && result.output) {
+        const outputContent = typeof result.output === "string" 
+          ? result.output 
+          : JSON.stringify(result.output);
+        // If we have substantial output, the task might be done
+        if (outputContent.length > 1000) {
+          console.log("Task appears complete (has output), breaking early");
+          break;
+        }
       }
 
       // Continue polling if still running (created or started)
