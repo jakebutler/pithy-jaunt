@@ -262,18 +262,36 @@ CRITICAL REQUIREMENTS:
     } else if (result.steps && Array.isArray(result.steps)) {
       // Look through steps for substantial content
       // The agent should have extracted the digest content
+      // Check in reverse order (most recent first) to find the latest extraction
       for (const step of result.steps.reverse()) {
-        // Check step output/memory/content fields
-        const stepContent = step.output || step.memory || step.content || step.text;
-        if (stepContent && typeof stepContent === "string" && stepContent.length > 2000) {
-          // Check if it looks like git ingest content
+        // Check multiple possible fields where content might be stored
+        const stepContent = 
+          step.output || 
+          step.memory || 
+          step.content || 
+          step.text ||
+          step.observation ||
+          step.result;
+        
+        if (stepContent && typeof stepContent === "string") {
+          // Look for git ingest content patterns
           if (
             /Repository:|Files analyzed:|Directory structure:|FILE:|================================================/.test(
               stepContent
             )
           ) {
-            content = stepContent;
-            break;
+            // Use the longest content found
+            if (stepContent.length > content.length) {
+              content = stepContent;
+            }
+          }
+        }
+        
+        // Also check if step has nested content in data/result fields
+        if (step.data && typeof step.data === "object") {
+          const dataStr = JSON.stringify(step.data);
+          if (dataStr.length > content.length && /Repository:|Directory structure:|FILE:/.test(dataStr)) {
+            content = dataStr;
           }
         }
       }
