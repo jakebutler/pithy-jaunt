@@ -39,48 +39,113 @@ export async function createWorkspace(params: {
   workspaceId: string;
   status: "creating" | "running";
 }> {
+  const requestId = Math.random().toString(36).substring(7);
+  const startTime = Date.now();
+  
+  console.log(`[Daytona:${requestId}] Starting workspace creation`, {
+    taskId: params.taskId,
+    repoUrl: params.repoUrl,
+    branch: params.branch,
+    modelProvider: params.modelProvider,
+    model: params.model,
+    timestamp: new Date().toISOString()
+  });
+
   // Use TypeScript SDK by default (simplest and most reliable)
   if (USE_SDK) {
-    console.log("[Daytona] Using TypeScript SDK to create workspace");
+    console.log(`[Daytona:${requestId}] Using TypeScript SDK to create workspace`);
     const { createWorkspaceViaSDK, isSDKAvailable } = await import("./sdk-client");
     
     if (!isSDKAvailable()) {
-      throw new Error("DAYTONA_API_KEY environment variable is required for SDK");
+      const error = new Error("DAYTONA_API_KEY environment variable is required for SDK");
+      console.error(`[Daytona:${requestId}] SDK configuration error`, {
+        error: error.message,
+        errorCode: "SDK_CONFIG_ERROR",
+        taskId: params.taskId,
+        timestamp: new Date().toISOString()
+      });
+      throw error;
     }
     
     try {
       const result = await createWorkspaceViaSDK(params);
-      console.log("[Daytona] SDK successfully created workspace:", result.workspaceId);
+      const executionTime = Date.now() - startTime;
+      console.log(`[Daytona:${requestId}] SDK successfully created workspace`, {
+        workspaceId: result.workspaceId,
+        executionTimeMs: executionTime,
+        taskId: params.taskId
+      });
       return result;
     } catch (error: any) {
-      console.error("[Daytona] SDK failed:", error.message);
-      console.error("[Daytona] Error details:", {
-        name: error.name,
-        stack: error.stack,
+      const executionTime = Date.now() - startTime;
+      console.error(`[Daytona:${requestId}] SDK workspace creation failed`, {
+        error: error.message,
+        errorCode: "SDK_CREATION_FAILED",
+        errorName: error.name,
+        errorStack: error.stack,
+        taskId: params.taskId,
+        executionTimeMs: executionTime,
+        timestamp: new Date().toISOString()
       });
+      
       // Don't fall through to REST API if SDK fails - throw the error instead
       // This prevents creating duplicate workspaces
-      throw new Error(`SDK failed to create workspace: ${error.message}`);
+      const enhancedError = new Error(`SDK failed to create workspace: ${error.message}`);
+      enhancedError.code = "SDK_CREATION_FAILED";
+      throw enhancedError;
     }
   }
 
   // If GitHub Actions is enabled, use it (bypasses REST API issues)
   if (USE_GITHUB_ACTIONS) {
-    console.log("[Daytona] Using GitHub Actions to create workspace");
+    console.log(`[Daytona:${requestId}] Using GitHub Actions to create workspace`);
     const { createWorkspaceViaGitHubActions, isGitHubActionsAvailable } = await import("./github-actions-client");
     
     if (!isGitHubActionsAvailable()) {
-      throw new Error(
+      const error = new Error(
         "GitHub Actions is enabled but required environment variables are missing. " +
         "Need: GITHUB_TOKEN, GITHUB_REPO_OWNER, GITHUB_REPO_NAME"
       );
+      console.error(`[Daytona:${requestId}] GitHub Actions configuration error`, {
+        error: error.message,
+        errorCode: "GITHUB_ACTIONS_CONFIG_ERROR",
+        taskId: params.taskId,
+        timestamp: new Date().toISOString()
+      });
+      throw error;
     }
     
-    return await createWorkspaceViaGitHubActions(params);
+    try {
+      const result = await createWorkspaceViaGitHubActions(params);
+      const executionTime = Date.now() - startTime;
+      console.log(`[Daytona:${requestId}] GitHub Actions successfully created workspace`, {
+        workspaceId: result.workspaceId,
+        executionTimeMs: executionTime,
+        taskId: params.taskId
+      });
+      return result;
+    } catch (error: any) {
+      const executionTime = Date.now() - startTime;
+      console.error(`[Daytona:${requestId}] GitHub Actions workspace creation failed`, {
+        error: error.message,
+        errorCode: "GITHUB_ACTIONS_CREATION_FAILED",
+        taskId: params.taskId,
+        executionTimeMs: executionTime,
+        timestamp: new Date().toISOString()
+      });
+      throw error;
+    }
   }
 
   if (!DAYTONA_API_KEY) {
-    throw new Error("DAYTONA_API_KEY environment variable is required");
+    const error = new Error("DAYTONA_API_KEY environment variable is required");
+    console.error(`[Daytona:${requestId}] API configuration error`, {
+      error: error.message,
+      errorCode: "API_CONFIG_ERROR",
+      taskId: params.taskId,
+      timestamp: new Date().toISOString()
+    });
+    throw error;
   }
   // TypeScript doesn't narrow after throw, so we assert the type
   const apiKeyString: string = DAYTONA_API_KEY;
@@ -106,13 +171,14 @@ export async function createWorkspace(params: {
     },
   };
 
-  console.log("[Daytona] Creating workspace:", {
+  console.log(`[Daytona:${requestId}] Creating workspace via REST API`, {
     url: `${DAYTONA_API_URL}/workspace`,
     hasApiKey: !!DAYTONA_API_KEY,
     apiKeyLength: DAYTONA_API_KEY?.length || 0,
     apiKeyPrefix: DAYTONA_API_KEY?.substring(0, 10) || "none",
     snapshotName: DAYTONA_SNAPSHOT_NAME,
     requestBody: JSON.stringify(requestBody, null, 2),
+    taskId: params.taskId
   });
 
   let response: Response;
@@ -127,39 +193,55 @@ export async function createWorkspace(params: {
       body: JSON.stringify(requestBody),
     });
   } catch (fetchError: any) {
+    const executionTime = Date.now() - startTime;
     // Handle network errors, DNS errors, connection refused, etc.
-    console.error("[Daytona] Fetch error:", {
-      message: fetchError.message,
-      name: fetchError.name,
-      code: fetchError.code,
-      cause: fetchError.cause,
+    console.error(`[Daytona:${requestId}] Fetch error during workspace creation`, {
+      error: fetchError.message,
+      errorName: fetchError.name,
+      errorCode: fetchError.code,
+      errorCause: fetchError.cause,
       url: `${DAYTONA_API_URL}/workspace`,
       apiUrl: DAYTONA_API_URL,
+      taskId: params.taskId,
+      executionTimeMs: executionTime,
+      timestamp: new Date().toISOString()
     });
 
     // Provide helpful error messages based on error type
     let errorMessage = "Failed to connect to Daytona API";
+    let errorCode = "CONNECTION_ERROR";
+    
     if (fetchError.message?.includes("ECONNREFUSED")) {
       errorMessage = `Connection refused. Check if DAYTONA_API_URL is correct: ${DAYTONA_API_URL}`;
+      errorCode = "CONNECTION_REFUSED";
     } else if (fetchError.message?.includes("ENOTFOUND") || fetchError.message?.includes("getaddrinfo")) {
       errorMessage = `DNS lookup failed. Check if DAYTONA_API_URL is correct: ${DAYTONA_API_URL}`;
+      errorCode = "DNS_ERROR";
     } else if (fetchError.message?.includes("timeout")) {
       errorMessage = `Request timeout. The Daytona API may be slow or unreachable: ${DAYTONA_API_URL}`;
+      errorCode = "TIMEOUT_ERROR";
     } else if (fetchError.message?.includes("certificate") || fetchError.message?.includes("SSL")) {
       errorMessage = `SSL/TLS error. Check if the Daytona API URL uses HTTPS correctly: ${DAYTONA_API_URL}`;
+      errorCode = "SSL_ERROR";
     } else {
       errorMessage = `Network error: ${fetchError.message || "Unknown error"}. Check DAYTONA_API_URL: ${DAYTONA_API_URL}`;
+      errorCode = "NETWORK_ERROR";
     }
 
-    throw new Error(errorMessage);
+    const enhancedError = new Error(errorMessage);
+    enhancedError.code = errorCode;
+    throw enhancedError;
   }
 
   if (!response.ok) {
+    const executionTime = Date.now() - startTime;
     const errorText = await response.text();
     const contentType = response.headers.get("content-type");
     
     // Parse HTML error responses (like CloudFront errors)
     let errorMessage = errorText;
+    let errorCode = "API_ERROR";
+    
     if (contentType?.includes("text/html")) {
       // Extract meaningful error from HTML
       const titleMatch = errorText.match(/<TITLE>(.*?)<\/TITLE>/i);
@@ -179,6 +261,7 @@ export async function createWorkspace(params: {
           "2. The API key is missing or invalid\n" +
           "3. CloudFront is blocking the request (IP, headers, etc.)\n" +
           `\nStatus: ${response.status} ${response.statusText}`;
+        errorCode = "CLOUDFRONT_ERROR";
       }
     }
     
@@ -191,254 +274,4 @@ export async function createWorkspace(params: {
       // Check for snapshot-related errors
       if (errorJson.message?.toLowerCase().includes("snapshot") || 
           errorJson.error?.toLowerCase().includes("snapshot")) {
-        console.error("[Daytona] Snapshot error detected:", errorJson);
-      }
-    } catch {
-      // Not JSON, use text as-is
-    }
-    
-    console.error("[Daytona] API error:", {
-      status: response.status,
-      statusText: response.statusText,
-      contentType,
-      errorMessage,
-      url: `${DAYTONA_API_URL}/workspace`,
-      requestBody: JSON.stringify(requestBody, null, 2),
-    });
-    
-    throw new Error(
-      `Daytona API error: ${response.status} ${response.statusText} - ${errorMessage}`
-    );
-  }
-
-  const data = await response.json();
-  
-  // Log the actual snapshot/image used by Daytona
-  const actualSnapshot = data.snapshot || data.image || "unknown";
-  const expectedSnapshot = DAYTONA_SNAPSHOT_NAME;
-  
-  console.log("[Daytona] Workspace created successfully:", {
-    workspaceId: data.workspaceId || data.id,
-    status: data.status || "creating",
-    expectedSnapshot,
-    actualSnapshot,
-    snapshotMatch: actualSnapshot === expectedSnapshot,
-    fullResponse: JSON.stringify(data, null, 2),
-  });
-  
-  // Warn if wrong snapshot is being used
-  if (actualSnapshot !== expectedSnapshot) {
-    console.warn("[Daytona] ⚠️ WARNING: Workspace is using wrong snapshot!");
-    console.warn(`[Daytona] Expected: ${expectedSnapshot}`);
-    console.warn(`[Daytona] Actual: ${actualSnapshot}`);
-    console.warn("[Daytona] This means the execution script won't run!");
-    
-    // If CLI fallback is enabled and snapshot doesn't match, try CLI
-    if (USE_CLI_FALLBACK) {
-      console.log("[Daytona] Attempting CLI fallback due to wrong snapshot...");
-      try {
-        const { createWorkspaceViaCLI, isCLIAvailable } = await import("./cli-client");
-        if (await isCLIAvailable()) {
-          console.log("[Daytona] CLI available, retrying with CLI...");
-          // Clean up the incorrectly created workspace
-          try {
-            await terminateWorkspace(data.workspaceId || data.id);
-          } catch {
-            // Ignore cleanup errors
-          }
-          return await createWorkspaceViaCLI(params);
-        } else {
-          console.warn("[Daytona] CLI not available, cannot use fallback");
-        }
-      } catch (cliError: any) {
-        console.error("[Daytona] CLI fallback failed:", cliError.message);
-        // Continue with the REST API result (even though it's wrong)
-      }
-    }
-  }
-  
-  return {
-    workspaceId: data.workspaceId || data.id,
-    status: data.status || "creating",
-  };
-}
-
-/**
- * Get workspace status
- */
-export async function getWorkspaceStatus(workspaceId: string): Promise<{
-  workspaceId: string;
-  status: "creating" | "running" | "stopped" | "terminated";
-}> {
-  if (!DAYTONA_API_KEY) {
-    throw new Error("DAYTONA_API_KEY environment variable is required");
-  }
-  // TypeScript doesn't narrow after throw, so we assert the type
-  const apiKeyString: string = DAYTONA_API_KEY;
-
-  const response = await fetch(`${DAYTONA_API_URL}/workspace/${workspaceId}`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${apiKeyString}`,
-    },
-  });
-
-  if (!response.ok) {
-    if (response.status === 404) {
-      return {
-        workspaceId,
-        status: "terminated",
-      };
-    }
-    const errorText = await response.text();
-    throw new Error(
-      `Daytona API error: ${response.status} ${response.statusText} - ${errorText}`
-    );
-  }
-
-  const data = await response.json();
-  
-  // Map Daytona status to our status format
-  // Daytona uses: "started", "stopped", "terminated"
-  // We use: "running", "stopped", "terminated", "creating"
-  let mappedStatus: "creating" | "running" | "stopped" | "terminated" = "running";
-  const daytonaStatus = data.status || data.state || "unknown";
-  
-  if (daytonaStatus === "started" || daytonaStatus === "Started") {
-    mappedStatus = "running";
-  } else if (daytonaStatus === "stopped" || daytonaStatus === "Stopped") {
-    mappedStatus = "stopped";
-  } else if (daytonaStatus === "terminated" || daytonaStatus === "Terminated") {
-    mappedStatus = "terminated";
-  } else if (daytonaStatus === "creating" || daytonaStatus === "Creating") {
-    mappedStatus = "creating";
-  }
-  
-  console.log("[Daytona] Workspace status retrieved:", {
-    workspaceId: data.workspaceId || data.id || workspaceId,
-    daytonaStatus,
-    mappedStatus,
-    snapshot: data.snapshot || data.image,
-  });
-  
-  return {
-    workspaceId: data.workspaceId || data.id || workspaceId,
-    status: mappedStatus,
-  };
-}
-
-/**
- * Terminate a workspace
- */
-export async function terminateWorkspace(workspaceId: string): Promise<void> {
-  if (!DAYTONA_API_KEY) {
-    throw new Error("DAYTONA_API_KEY environment variable is required");
-  }
-  // TypeScript doesn't narrow after throw, so we assert the type
-  const apiKeyString: string = DAYTONA_API_KEY;
-
-  const response = await fetch(`${DAYTONA_API_URL}/workspace/${workspaceId}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${apiKeyString}`,
-    },
-  });
-
-  if (!response.ok && response.status !== 404) {
-    // 404 is acceptable (workspace already terminated)
-    const errorText = await response.text();
-    throw new Error(
-      `Daytona API error: ${response.status} ${response.statusText} - ${errorText}`
-    );
-  }
-}
-
-/**
- * List all workspaces
- */
-export async function listWorkspaces(): Promise<Array<{
-  workspaceId: string;
-  name?: string;
-  status: "creating" | "running" | "stopped" | "terminated";
-  createdAt?: number;
-}>> {
-  if (!DAYTONA_API_KEY) {
-    throw new Error("DAYTONA_API_KEY environment variable is required");
-  }
-  // TypeScript doesn't narrow after throw, so we assert the type
-  const apiKeyString: string = DAYTONA_API_KEY;
-
-  const response = await fetch(`${DAYTONA_API_URL}/workspace`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${apiKeyString}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Daytona API error: ${response.status} ${response.statusText} - ${errorText}`
-    );
-  }
-
-  const data = await response.json();
-  
-  // Handle both array and object responses
-  const workspaces = Array.isArray(data) ? data : (data.workspaces || []);
-  
-  return workspaces.map((ws: any) => {
-    const daytonaStatus = ws.status || ws.state || "unknown";
-    let mappedStatus: "creating" | "running" | "stopped" | "terminated" = "running";
-    
-    if (daytonaStatus === "started" || daytonaStatus === "Started") {
-      mappedStatus = "running";
-    } else if (daytonaStatus === "stopped" || daytonaStatus === "Stopped") {
-      mappedStatus = "stopped";
-    } else if (daytonaStatus === "terminated" || daytonaStatus === "Terminated") {
-      mappedStatus = "terminated";
-    } else if (daytonaStatus === "creating" || daytonaStatus === "Creating") {
-      mappedStatus = "creating";
-    }
-    
-    return {
-      workspaceId: ws.workspaceId || ws.id || ws.name,
-      name: ws.name,
-      status: mappedStatus,
-      createdAt: ws.createdAt ? new Date(ws.createdAt).getTime() : undefined,
-    };
-  });
-}
-
-/**
- * Stop a workspace (without terminating it)
- */
-export async function stopWorkspace(workspaceId: string): Promise<void> {
-  if (!DAYTONA_API_KEY) {
-    throw new Error("DAYTONA_API_KEY environment variable is required");
-  }
-  // TypeScript doesn't narrow after throw, so we assert the type
-  const apiKeyString: string = DAYTONA_API_KEY;
-
-  const response = await fetch(`${DAYTONA_API_URL}/workspace/${workspaceId}/stop`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKeyString}`,
-    },
-  });
-
-  if (!response.ok && response.status !== 404) {
-    const errorText = await response.text();
-    throw new Error(
-      `Daytona API error: ${response.status} ${response.statusText} - ${errorText}`
-    );
-  }
-}
-
-/**
- * Check if Daytona is configured
- */
-export function isDaytonaConfigured(): boolean {
-  return !!DAYTONA_API_KEY && !!DAYTONA_API_URL;
-}
-
+        console.error(`[Daytona:${requestId}] Snapshot

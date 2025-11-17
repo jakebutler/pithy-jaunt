@@ -1,271 +1,209 @@
-import { createClient } from "@/lib/auth/supabase-server";
-import { NextResponse } from "next/server";
-import { convexClient } from "@/lib/convex/server";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
-import { createWorkspace, isDaytonaConfigured } from "@/lib/daytona/client";
+import { NextRequest, NextResponse } from "next/server";
+import { createWorkspace } from "@/lib/daytona/client";
+import { auth } from "@/lib/auth/server";
+import { db } from "@/lib/db/server";
+import { tasks } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 /**
+ * Execute a task by creating a Daytona workspace
  * POST /api/task/[taskId]/execute
- * Execute a task: provision Daytona workspace, run agent, create PR
- * 
- * Request body:
- * {
- *   "keepWorkspaceAlive": false // optional
- * }
  */
 export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ taskId: string }> }
+  request: NextRequest,
+  { params }: { params: { taskId: string } }
 ) {
+  const requestId = Math.random().toString(36).substring(7);
   const startTime = Date.now();
-  console.log("[TASK EXECUTE] Starting task execution request");
   
   try {
-    const { taskId } = await params;
-    console.log("[TASK EXECUTE] Task ID:", taskId);
-    
-    // Get authenticated user
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      console.log("[TASK EXECUTE] No user found:", authError?.message);
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    console.log("[TASK EXECUTE] User authenticated:", user.id);
-
-    // Get user from Convex
-    const convexUser = await convexClient.query(
-      api.users.getUserBySupabaseId,
-      { supabaseUserId: user.id }
-    );
-
-    if (!convexUser) {
-      console.log("[TASK EXECUTE] User not found in Convex");
+    // Authenticate user
+    const user = await auth.getUser(request);
+    if (!user) {
+      console.error(`[TaskExecute:${requestId}] Authentication failed - no user found`);
       return NextResponse.json(
-        { error: "User not found in database" },
-        { status: 404 }
+        { 
+          error: "Unauthorized",
+          errorCode: "AUTH_FAILED",
+          requestId 
+        },
+        { status: 401 }
       );
     }
 
-    console.log("[TASK EXECUTE] Convex user found:", convexUser._id);
-
-    // Get task
-    const task = await convexClient.query(api.tasks.getTaskById, {
-      taskId: taskId as Id<"tasks">,
+    console.log(`[TaskExecute:${requestId}] Starting task execution`, {
+      taskId: params.taskId,
+      userId: user.id,
+      timestamp: new Date().toISOString()
     });
 
-    if (!task) {
-      console.log("[TASK EXECUTE] Task not found:", taskId);
-      return NextResponse.json(
-        { error: "Task not found" },
-        { status: 404 }
-      );
-    }
+    // Get task details
+    const task = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.id, params.taskId))
+      .limit(1);
 
-    console.log("[TASK EXECUTE] Task found:", {
-      taskId: task._id,
-      status: task.status,
-      userId: task.userId,
-      repoId: task.repoId,
-      hasModelPreference: !!task.modelPreference,
-    });
-
-    // Verify user owns the task
-    if (task.userId !== convexUser._id) {
-      console.log("[TASK EXECUTE] User doesn't own task:", {
-        taskUserId: task.userId,
-        currentUserId: convexUser._id,
+    if (!task || task.length === 0) {
+      console.error(`[TaskExecute:${requestId}] Task not found`, {
+        taskId: params.taskId,
+        userId: user.id
       });
       return NextResponse.json(
-        { error: "Forbidden: You don't have access to this task" },
+        { 
+          error: "Task not found",
+          errorCode: "TASK_NOT_FOUND",
+          requestId 
+        },
+        { status: 404 }
+      );
+    }
+
+    const taskData = task[0];
+    
+    // Validate task ownership
+    if (taskData.userId !== user.id) {
+      console.error(`[TaskExecute:${requestId}] Unauthorized task access`, {
+        taskId: params.taskId,
+        userId: user.id,
+        taskOwnerId: taskData.userId
+      });
+      return NextResponse.json(
+        { 
+          error: "Unauthorized access to task",
+          errorCode: "UNAUTHORIZED_ACCESS",
+          requestId 
+        },
         { status: 403 }
       );
     }
 
-    // Check if task is in a valid state for execution
-    if (task.status !== "queued" && task.status !== "needs_review") {
-      console.log("[TASK EXECUTE] Invalid task status:", task.status);
+    // Validate required fields
+    if (!taskData.repoUrl || !taskData.branch || !taskData.description) {
+      console.error(`[TaskExecute:${requestId}] Invalid task configuration`, {
+        taskId: params.taskId,
+        userId: user.id,
+        repoUrl: taskData.repoUrl,
+        branch: taskData.branch,
+        hasDescription: !!taskData.description
+      });
       return NextResponse.json(
-        {
-          error: `Task cannot be executed. Current status: ${task.status}`,
+        { 
+          error: "Invalid task configuration - missing required fields",
+          errorCode: "INVALID_TASK_CONFIG",
+          requestId 
         },
         { status: 400 }
       );
     }
 
-    // Parse request body (optional)
-    let keepWorkspaceAlive = false;
-    try {
-      const contentType = request.headers.get("content-type");
-      if (contentType?.includes("application/json")) {
-        const body = await request.json();
-        keepWorkspaceAlive = body.keepWorkspaceAlive || false;
-      }
-    } catch (error) {
-      // Empty body or invalid JSON is fine, use defaults
-      console.log("[TASK EXECUTE] Could not parse request body:", error);
-    }
-
-    // Get repository info
-    const repo = await convexClient.query(api.repos.getRepoById, {
-      repoId: task.repoId,
-    });
-
-    console.log("[TASK EXECUTE] Repository query result:", {
-      repoFound: !!repo,
-      repoId: task.repoId,
-    });
-
-    if (!repo) {
-      console.log("[TASK EXECUTE] Repository not found:", task.repoId);
+    // Extract repo owner and name from URL
+    const repoMatch = taskData.repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+    if (!repoMatch) {
+      console.error(`[TaskExecute:${requestId}] Invalid repository URL format`, {
+        taskId: params.taskId,
+        userId: user.id,
+        repoUrl: taskData.repoUrl
+      });
       return NextResponse.json(
-        { error: "Repository not found" },
-        { status: 404 }
-      );
-    }
-
-    console.log("[TASK EXECUTE] Repository found:", {
-      repoId: repo._id,
-      url: repo.url,
-      branch: repo.branch,
-      owner: repo.owner,
-      name: repo.name,
-    });
-
-    // Validate repository has required fields
-    if (!repo.url) {
-      console.log("[TASK EXECUTE] Repository URL is missing");
-      return NextResponse.json(
-        { error: "Repository URL is missing" },
+        { 
+          error: "Invalid repository URL format",
+          errorCode: "INVALID_REPO_URL",
+          requestId 
+        },
         { status: 400 }
       );
     }
 
-    if (!repo.branch) {
-      console.log("[TASK EXECUTE] Repository branch is missing");
-      return NextResponse.json(
-        { error: "Repository branch is missing" },
-        { status: 400 }
-      );
-    }
+    const [, owner, repo] = repoMatch;
+    const repoId = `${owner}/${repo}`;
 
-    // Validate task has model preference
-    console.log("[TASK EXECUTE] Model preference check:", {
-      hasModelPreference: !!task.modelPreference,
-      modelPreference: task.modelPreference,
+    console.log(`[TaskExecute:${requestId}] Creating Daytona workspace`, {
+      taskId: params.taskId,
+      userId: user.id,
+      repoId,
+      repoUrl: taskData.repoUrl,
+      branch: taskData.branch,
+      modelProvider: taskData.modelProvider || "openai",
+      model: taskData.model || "gpt-4o-mini"
     });
 
-    if (!task.modelPreference || !task.modelPreference.provider || !task.modelPreference.model) {
-      console.log("[TASK EXECUTE] Task model preference is missing or invalid");
-      return NextResponse.json(
-        { error: "Task model preference is missing or invalid" },
-        { status: 400 }
-      );
-    }
-
-    // Check if Daytona is configured
-    if (!isDaytonaConfigured()) {
-      return NextResponse.json(
-        {
-          error:
-            "Daytona is not configured. Please set DAYTONA_API_URL and DAYTONA_API_KEY environment variables.",
-        },
-        { status: 503 }
-      );
-    }
-
-    // Update task status to running
-    await convexClient.mutation(api.tasks.updateTaskStatus, {
-      taskId: task._id,
-      status: "running",
+    // Create Daytona workspace
+    const workspace = await createWorkspace({
+      repoUrl: taskData.repoUrl,
+      branch: taskData.branch,
+      taskId: params.taskId,
+      taskDescription: taskData.description,
+      modelProvider: taskData.modelProvider || "openai",
+      model: taskData.model || "gpt-4o-mini",
+      keepWorkspaceAlive: taskData.keepAlive || false,
     });
 
-    try {
-      // Create Daytona workspace
-      const workspace = await createWorkspace({
-        repoUrl: repo.url,
-        branch: repo.branch,
-        taskId: task._id,
-        taskDescription: task.description,
-        modelProvider: task.modelPreference.provider,
-        model: task.modelPreference.model,
-        keepWorkspaceAlive: keepWorkspaceAlive,
-      });
+    const executionTime = Date.now() - startTime;
+    console.log(`[TaskExecute:${requestId}] Workspace created successfully`, {
+      taskId: params.taskId,
+      userId: user.id,
+      repoId,
+      workspaceId: workspace.workspaceId,
+      status: workspace.status,
+      executionTimeMs: executionTime
+    });
 
-      // Create workspace record in Convex
-      const workspaceId = await convexClient.mutation(
-        api.workspaces.createWorkspace,
-        {
-          daytonaId: workspace.workspaceId,
-          template: process.env.DAYTONA_SNAPSHOT_NAME || "butlerjake/pithy-jaunt-daytona:v1.0.2",
-          assignedTasks: [task._id],
-        }
-      );
+    return NextResponse.json({
+      success: true,
+      workspaceId: workspace.workspaceId,
+      status: workspace.status,
+      requestId,
+      executionTimeMs: executionTime
+    });
 
-      // Assign workspace to task
-      await convexClient.mutation(api.workspaces.assignTaskToWorkspace, {
-        workspaceId,
-        taskId: task._id,
-      });
-
-      // Update task with workspace ID and branch name
-      await convexClient.mutation(api.tasks.updateTaskWorkspace, {
-        taskId: task._id,
-        assignedWorkspaceId: workspace.workspaceId,
-        branchName: `pj/${task._id}`,
-      });
-
-      return NextResponse.json(
-        {
-          taskId: task._id,
-          status: "running",
-          workspaceId: workspace.workspaceId,
-        },
-        { status: 202 }
-      );
-    } catch (error: any) {
-      console.error("Workspace creation error:", error);
-      console.error("Error details:", {
-        message: error.message,
-        stack: error.stack,
-        taskId: task._id,
-        repoUrl: repo.url,
-        branch: repo.branch,
-      });
-
-      // Update task status to failed
-      await convexClient.mutation(api.tasks.updateTaskStatus, {
-        taskId: task._id,
-        status: "failed",
-      });
-
-      return NextResponse.json(
-        {
-          error: "Failed to create workspace",
-          details: error.message || "Unknown error",
-        },
-        { status: 500 }
-      );
-    }
   } catch (error: any) {
-    console.error("Task execution error:", error);
-    console.error("Error details:", {
-      message: error.message,
-      stack: error.stack,
+    const executionTime = Date.now() - startTime;
+    
+    // Log comprehensive error details
+    console.error(`[TaskExecute:${requestId}] Task execution failed`, {
+      taskId: params.taskId,
+      userId: (await auth.getUser(request))?.id || "unknown",
+      error: error.message,
+      errorCode: error.code || "EXECUTION_FAILED",
+      errorStack: error.stack,
+      errorName: error.name,
+      executionTimeMs: executionTime,
+      timestamp: new Date().toISOString()
     });
+
+    // Handle specific error types
+    let errorMessage = "Failed to execute task";
+    let errorCode = "EXECUTION_FAILED";
+    let statusCode = 500;
+
+    if (error.message?.includes("DAYTONA_API_KEY")) {
+      errorMessage = "Daytona API configuration error";
+      errorCode = "DAYTONA_CONFIG_ERROR";
+      statusCode = 503;
+    } else if (error.message?.includes("SDK failed")) {
+      errorMessage = "Workspace creation service unavailable";
+      errorCode = "WORKSPACE_SERVICE_ERROR";
+      statusCode = 503;
+    } else if (error.message?.includes("Connection refused")) {
+      errorMessage = "Workspace service connection failed";
+      errorCode = "CONNECTION_ERROR";
+      statusCode = 503;
+    } else if (error.message?.includes("snapshot")) {
+      errorMessage = "Invalid workspace configuration";
+      errorCode = "WORKSPACE_CONFIG_ERROR";
+      statusCode = 400;
+    }
+
     return NextResponse.json(
       { 
-        error: "Failed to execute task",
-        details: error.message || "Unknown error",
+        error: errorMessage,
+        errorCode,
+        requestId,
+        executionTimeMs: executionTime,
+        details: process.env.NODE_ENV === "development" ? error.message : undefined
       },
-      { status: 500 }
+      { status: statusCode }
     );
   }
 }
-
