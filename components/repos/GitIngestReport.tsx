@@ -1,8 +1,11 @@
 "use client";
 
 import { GitIngestReport as GitIngestReportType } from "@/lib/gitingest/client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 
 interface GitIngestReportProps {
   status: "pending" | "processing" | "completed" | "failed";
@@ -12,27 +15,23 @@ interface GitIngestReportProps {
 }
 
 export function GitIngestReport({
-  status,
-  report,
-  error,
+  status: initialStatus,
+  report: initialReport,
+  error: initialError,
   repoId,
 }: GitIngestReportProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const router = useRouter();
 
-  // Poll for updates when status is "processing"
-  useEffect(() => {
-    if (status !== "processing") {
-      return;
-    }
+  // Use Convex real-time subscription to get live updates
+  const repo = useQuery(api.repos.getRepoById, {
+    repoId: repoId as Id<"repos">,
+  });
 
-    const interval = setInterval(() => {
-      // Refresh the page data by revalidating
-      router.refresh();
-    }, 3000); // Poll every 3 seconds
-
-    return () => clearInterval(interval);
-  }, [status, router]);
+  // Use live data if available, otherwise fall back to initial props
+  const status = repo?.gitingestReportStatus || initialStatus;
+  const report = repo?.gitingestReport || initialReport;
+  const error = repo?.gitingestReportError || initialError;
 
   async function handleGenerateReport() {
     setIsGenerating(true);
@@ -85,7 +84,7 @@ export function GitIngestReport({
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <div className="flex items-center gap-3">
           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-          <div>
+          <div className="flex-1">
             <h3 className="text-lg font-medium text-gray-900">
               GitIngest Report
             </h3>
@@ -93,6 +92,51 @@ export function GitIngestReport({
               Generating repository report... This may take a few moments.
             </p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show "Report Available" state when report is ready but user hasn't viewed it yet
+  // This happens when status changes from "processing" to "completed" via real-time update
+  // We check if the report exists in the live data but wasn't in the initial props
+  const reportJustCompleted = status === "completed" && report && !initialReport;
+  
+  if (reportJustCompleted) {
+    return (
+      <div className="bg-white border border-green-200 rounded-lg p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">
+                GitIngest Report
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Report generation complete! Click below to view.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.refresh()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium"
+          >
+            View Report
+          </button>
         </div>
       </div>
     );
