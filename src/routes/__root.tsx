@@ -1,8 +1,9 @@
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router'
 import { AuthProvider } from '@/lib/auth/context'
 import { ConvexClientProvider } from '@/lib/convex/client'
+import { ErrorBoundary, useSentryUserContext } from '@/lib/sentry/error-boundary'
 // Import CSS directly - TanStack Start will handle it
-import '@/src/globals.css'
+import '../globals.css'
 
 interface RouterContext {
   request?: Request
@@ -28,11 +29,23 @@ function RootComponent() {
   // TanStack Start handles <html> and <body> tags automatically
   // We just need to return the app content
   return (
-    <ConvexClientProvider>
-      <AuthProvider>
-        <Outlet />
-      </AuthProvider>
-    </ConvexClientProvider>
+    <ErrorBoundary>
+      <ConvexClientProvider>
+        <AuthProvider>
+          <SentryUserContextWrapper>
+            <Outlet />
+          </SentryUserContextWrapper>
+        </AuthProvider>
+      </ConvexClientProvider>
+    </ErrorBoundary>
   )
+}
+
+/**
+ * Wrapper component to set Sentry user context when auth state changes
+ */
+function SentryUserContextWrapper({ children }: { children: React.ReactNode }) {
+  useSentryUserContext()
+  return <>{children}</>
 }
 
