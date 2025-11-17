@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/auth/supabase-server";
 import { NextResponse } from "next/server";
 import { convexClient } from "@/lib/convex/server";
+import { errorResponse, successResponse, internalServerErrorResponse } from "@/lib/utils/api-response";
 
 /**
  * POST /api/auth/signup
@@ -13,17 +14,11 @@ export async function POST(request: Request) {
 
     // Validate input
     if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required" },
-        { status: 400 }
-      );
+      return errorResponse("Email and password are required", 400);
     }
 
     if (password.length < 8) {
-      return NextResponse.json(
-        { error: "Password must be at least 8 characters" },
-        { status: 400 }
-      );
+      return errorResponse("Password must be at least 8 characters", 400);
     }
 
     // Create user in Supabase
@@ -37,10 +32,7 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status || 400 }
-      );
+      return errorResponse(error.message, error.status || 400);
     }
 
     // Sync user to Convex (if user was created)
@@ -60,20 +52,16 @@ export async function POST(request: Request) {
     }
 
     // Return user data
-    return NextResponse.json(
+    return successResponse(
       {
         userId: data.user?.id,
         email: data.user?.email,
         message: "User created successfully",
       },
-      { status: 201 }
+      201
     );
   } catch (error) {
     console.error("Signup error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return internalServerErrorResponse();
   }
 }
-

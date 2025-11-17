@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/auth/supabase-server";
 import { NextResponse } from "next/server";
+import { errorResponse, successResponse, internalServerErrorResponse } from "@/lib/utils/api-response";
 
 /**
  * POST /api/auth/login
@@ -11,10 +12,7 @@ export async function POST(request: Request) {
 
     // Validate input
     if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required" },
-        { status: 400 }
-      );
+      return errorResponse("Email and password are required", 400);
     }
 
     // Sign in with Supabase
@@ -26,27 +24,20 @@ export async function POST(request: Request) {
 
     if (error) {
       // Return generic error for security (don't reveal if email exists)
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
-      );
+      return errorResponse("Invalid credentials", 401);
     }
 
     // Return session data
-    return NextResponse.json(
+    return successResponse(
       {
         userId: data.user?.id,
         email: data.user?.email,
         message: "Login successful",
       },
-      { status: 200 }
+      200
     );
   } catch (error) {
     console.error("Login error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return internalServerErrorResponse();
   }
 }
-
