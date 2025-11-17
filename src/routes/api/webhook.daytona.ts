@@ -3,11 +3,13 @@ import { convexClient } from '@/lib/convex/server'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
 import { cleanupWorkspace } from '@/lib/daytona/maintenance'
+import { captureError } from '@/lib/sentry/error-handler'
 
 export const Route = createFileRoute('/api/webhook/daytona')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        let body: any = {}
         try {
           // Read raw body first
           const rawBody = await request.text()
@@ -15,7 +17,6 @@ export const Route = createFileRoute('/api/webhook/daytona')({
           console.log(rawBody)
           console.log('[Daytona Webhook] ======================================')
           
-          let body
           try {
             body = JSON.parse(rawBody)
           } catch (parseError) {
@@ -299,6 +300,15 @@ export const Route = createFileRoute('/api/webhook/daytona')({
           return Response.json({ status: 'ok' }, { status: 200 })
         } catch (error: any) {
           console.error('Daytona webhook error:', error)
+          
+          // Capture error in Sentry with webhook context
+          captureError(error, {
+            operation: 'daytona_webhook',
+            webhookType: body?.type,
+            taskId: body?.taskId,
+            workspaceId: body?.workspaceId,
+          })
+          
           // Return 200 to prevent Daytona from retrying
           return Response.json(
             { error: 'Webhook processing failed' },

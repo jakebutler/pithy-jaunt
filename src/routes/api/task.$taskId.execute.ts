@@ -6,6 +6,7 @@ import { Id } from '@/convex/_generated/dataModel'
 import { createWorkspace, isDaytonaConfigured } from '@/lib/daytona/client'
 import { enhanceTaskPrompt } from '@/lib/task/prompt-enhancer'
 import { GitIngestReport } from '@/lib/gitingest/client'
+import { captureError } from '@/lib/sentry/error-handler'
 
 export const Route = createFileRoute('/api/task/$taskId/execute')({
   server: {
@@ -185,6 +186,14 @@ export const Route = createFileRoute('/api/task/$taskId/execute')({
             )
           } catch (error: any) {
             console.error('Workspace creation error:', error)
+            
+            // Capture error in Sentry with context
+            captureError(error, {
+              taskId: task._id,
+              repoId: task.repoId,
+              userId: convexUser._id,
+              operation: 'workspace_creation',
+            })
 
             // Update task status to failed
             await convexClient.mutation(api.tasks.updateTaskStatus, {
@@ -202,6 +211,13 @@ export const Route = createFileRoute('/api/task/$taskId/execute')({
           }
         } catch (error: any) {
           console.error('Task execution error:', error)
+          
+          // Capture error in Sentry
+          captureError(error, {
+            taskId: params.taskId,
+            operation: 'task_execution',
+          })
+          
           return Response.json(
             { 
               error: 'Failed to execute task',
