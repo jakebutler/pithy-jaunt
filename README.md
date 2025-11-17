@@ -160,6 +160,8 @@ npm run lint
 npm run a11y
 ```
 
+## Local Development
+
 ## 🚢 Deployment
 
 ### Web (Vercel)
@@ -232,8 +234,3 @@ MIT License - see [LICENSE](LICENSE) file for details
 ## 📞 Contact
 
 For questions or support, please open an issue or contact the maintainers.
-
----
-
-Built with ❤️ for the [Hackathon Name] Hackathon
-
