@@ -160,12 +160,23 @@ async def analyze_repository(repo_path: Path) -> dict:
             
             # Detect language
             try:
-                lexer = guess_lexer_for_filename(str(file_path))
+                # Use get_lexer_for_filename which only needs the filename
+                lexer = get_lexer_for_filename(str(file_path))
                 lang = lexer.name
                 if lang not in ['Text only', 'Text']:
                     structure["languages"].add(lang)
-            except ClassNotFound:
-                pass
+            except (ClassNotFound, ValueError):
+                # If we can't detect from filename, try to guess from content
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read(1024)  # Read first 1KB
+                        if content.strip():
+                            lexer = guess_lexer_for_filename(str(file_path), content)
+                            lang = lexer.name
+                            if lang not in ['Text only', 'Text']:
+                                structure["languages"].add(lang)
+                except:
+                    pass
             
             # Check for entry points
             if file in entry_point_patterns:

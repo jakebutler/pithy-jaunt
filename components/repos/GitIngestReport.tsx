@@ -225,7 +225,7 @@ export function GitIngestReport({
               <div className="mt-2">
                 <span className="text-gray-500 text-sm">Entry Points:</span>
                 <ul className="list-disc list-inside mt-1 text-sm text-gray-600">
-                  {report.structure.entryPoints.map((entry, idx) => (
+                  {report.structure.entryPoints.map((entry: string, idx: number) => (
                     <li key={idx}>{entry}</li>
                   ))}
                 </ul>
@@ -295,7 +295,7 @@ export function GitIngestReport({
               <div className="mb-2">
                 <span className="text-gray-500 text-sm">Runtime:</span>
                 <ul className="list-disc list-inside mt-1 text-sm text-gray-600">
-                  {report.dependencies.runtime.slice(0, 10).map((dep, idx) => (
+                  {report.dependencies.runtime.slice(0, 10).map((dep: string, idx: number) => (
                     <li key={idx}>{dep}</li>
                   ))}
                   {report.dependencies.runtime.length > 10 && (
