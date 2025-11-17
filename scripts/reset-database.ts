@@ -1,10 +1,17 @@
 #!/usr/bin/env node
 /**
- * Reset database - delete all tasks and workspaces
+ * Reset database - delete all tasks, workspaces, and repositories
+ * Keeps users intact
  * This uses the Convex HTTP client directly
  */
 
+// Load environment variables
+const path = require("path");
+require("dotenv").config({ path: path.resolve(process.cwd(), ".env.local") });
+require("dotenv").config({ path: path.resolve(process.cwd(), ".env") });
+
 import { ConvexHttpClient } from "convex/browser";
+import { api } from "../convex/_generated/api";
 
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
 
@@ -19,28 +26,29 @@ const client = new ConvexHttpClient(CONVEX_URL);
 async function resetDatabase() {
   try {
     console.log("\n🗑️  Resetting database...\n");
+    console.log("Note: This will delete ALL repos, tasks, and workspaces");
+    console.log("Users will be preserved.\n");
 
-    // Note: This will delete ALL workspaces and ALL tasks for ALL users
-    // In production, you'd want to scope this to a specific user
-    
+    // Delete all repositories
+    console.log("Deleting all repositories...");
+    const reposResult = await client.mutation(api.repos.deleteAllRepos, {});
+    console.log(`✓ Deleted ${reposResult.deleted} repositories\n`);
+
+    // Delete all tasks
+    console.log("Deleting all tasks...");
+    const tasksResult = await client.mutation(api.tasks.deleteAllTasks, {});
+    console.log(`✓ Deleted ${tasksResult.deleted} tasks\n`);
+
+    // Delete all workspaces
     console.log("Deleting all workspaces...");
     const workspaceResult = await client.mutation(
-      "workspaces:deleteAllWorkspaces" as any,
+      api.workspaces.deleteAllWorkspaces,
       {}
     );
-    console.log(`✓ Deleted ${workspaceResult.deleted} workspaces`);
-
-    // For tasks, we need a user ID. Let's just document the manual approach
-    console.log("\n⚠️  To delete tasks, use the Convex dashboard:");
-    console.log("1. Go to: https://dashboard.convex.dev");
-    console.log("2. Select your project");
-    console.log("3. Go to 'Data' tab");
-    console.log("4. Select 'tasks' table");
-    console.log("5. Delete all rows");
-    console.log("\nOR use the API endpoint while Next.js is running:");
-    console.log("curl -X DELETE http://localhost:3000/api/debug/delete-all-tasks");
+    console.log(`✓ Deleted ${workspaceResult.deleted} workspaces\n`);
     
-    console.log("\n✅ Database reset complete!\n");
+    console.log("✅ Database reset complete!");
+    console.log("✓ Users preserved\n");
     
     process.exit(0);
     
