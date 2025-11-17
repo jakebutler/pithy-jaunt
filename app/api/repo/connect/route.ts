@@ -114,7 +114,8 @@ export async function POST(request: Request) {
     // Trigger GitIngest report generation asynchronously
     // Non-blocking: repo connection succeeds even if GitIngest fails
     try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      // Normalize app URL to remove trailing slashes
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "");
       const callbackUrl = `${appUrl}/api/repo/gitingest-callback`;
 
       // Update status to processing before triggering

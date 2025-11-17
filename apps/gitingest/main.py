@@ -142,7 +142,8 @@ async def send_webhook_callback(callback_url: str, job_id: str, repo_url: str, b
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            # Follow redirects (e.g., 308 Permanent Redirect)
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 response = await client.post(callback_url, json=payload)
                 response.raise_for_status()
                 logger.info(f"Webhook callback sent successfully (attempt {attempt + 1})")
