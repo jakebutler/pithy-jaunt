@@ -2,8 +2,8 @@
 # Vercel Ignore Build Step
 # 
 # This script determines if Vercel should build the Next.js app.
-# Returns 0 (build) if files outside apps/gitingest/ changed
-# Returns 1 (skip build) if only apps/gitingest/ files changed
+# Returns 1 (build) if files outside apps/gitingest/ changed
+# Returns 0 (skip build) if only apps/gitingest/ files changed
 #
 # Configure in Vercel: Settings → Git → Ignore Build Step
 # Command: ./scripts/vercel-ignore-build.sh
@@ -29,7 +29,7 @@ CHANGED_FILES=$(git diff --name-only "$BASE_REF" "$HEAD_REF" 2>/dev/null || echo
 # If no changes detected, build (safety default)
 if [ -z "$CHANGED_FILES" ]; then
   echo "No changed files detected, building..."
-  exit 0
+  exit 1  # Exit 1 = build needed
 fi
 
 # Check if any files outside apps/gitingest/ changed
@@ -40,12 +40,12 @@ if [ -n "$NON_GITINGEST_CHANGES" ]; then
   echo "Changes detected outside apps/gitingest/, building..."
   echo "Changed files:"
   echo "$NON_GITINGEST_CHANGES" | head -10
-  exit 0
+  exit 1  # Exit 1 = build needed
 fi
 
 # Only GitIngest files changed, skip build
 echo "Only apps/gitingest/ files changed, skipping Vercel build..."
 echo "Changed files:"
 echo "$CHANGED_FILES"
-exit 1
+exit 0  # Exit 0 = skip build
 
