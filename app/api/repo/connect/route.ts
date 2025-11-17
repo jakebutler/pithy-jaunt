@@ -96,6 +96,7 @@ export async function POST(request: Request) {
     }
 
     // Create repository record in Convex
+    // Note: createRepo already sets gitingestReportStatus to "pending"
     const repoId = await convexClient.mutation(api.repos.createRepo, {
       userId: convexUser._id,
       url: metadata.url,
@@ -105,11 +106,10 @@ export async function POST(request: Request) {
       coderabbitDetected: false, // CodeRabbit integration disabled for now
     });
 
-    // Initialize GitIngest report status
-    await convexClient.mutation(api.repos.updateGitIngestReport, {
-      repoId,
-      status: "pending",
-    });
+    // Ensure repoId is a valid string (Convex IDs are strings)
+    if (!repoId || typeof repoId !== "string") {
+      throw new Error("Failed to create repository: invalid ID returned");
+    }
 
     // Trigger GitIngest report generation asynchronously
     // Non-blocking: repo connection succeeds even if GitIngest fails
@@ -117,9 +117,9 @@ export async function POST(request: Request) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
       const callbackUrl = `${appUrl}/api/repo/gitingest-callback`;
 
-      // Update status to processing
+      // Update status to processing before triggering
       await convexClient.mutation(api.repos.updateGitIngestReport, {
-        repoId,
+        repoId: repoId as Id<"repos">,
         status: "processing",
       });
 
@@ -131,13 +131,18 @@ export async function POST(request: Request) {
       });
     } catch (error) {
       // Log error but don't fail the connection
-      console.error("Failed to trigger GitIngest report generation:", error);
-      // Set status to pending - can be retried later
-      await convexClient.mutation(api.repos.updateGitIngestReport, {
-        repoId,
-        status: "pending",
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+      console.error("Error triggering GitIngest report generation:", error);
+      // Set status to failed with error message
+      try {
+        await convexClient.mutation(api.repos.updateGitIngestReport, {
+          repoId: repoId as Id<"repos">,
+          status: "failed",
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      } catch (updateError) {
+        // If updating status fails, log but don't throw
+        console.error("Failed to update GitIngest status:", updateError);
+      }
     }
 
     // Return success response
