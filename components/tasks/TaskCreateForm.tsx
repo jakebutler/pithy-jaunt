@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "@tanstack/react-router";
 
 interface TaskCreateFormProps {
   repoId: string;
@@ -23,7 +23,7 @@ export function TaskCreateForm({
   onSuccess,
   initialData,
 }: TaskCreateFormProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [title, setTitle] = useState(initialData?.title || "");
   const [description, setDescription] = useState(initialData?.description || "");
   const [priority, setPriority] = useState<"low" | "normal" | "high">("normal");
@@ -58,9 +58,8 @@ export function TaskCreateForm({
       if (onSuccess) {
         onSuccess(data.taskId);
       } else {
-        router.push(`/tasks/${data.taskId}`);
+        navigate({ to: '/tasks/$taskId', params: { taskId: data.taskId } });
       }
-      router.refresh();
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
     } finally {

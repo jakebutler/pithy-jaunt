@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "@tanstack/react-router";
 
 interface TaskActionsProps {
   taskId: string;
@@ -13,7 +13,7 @@ interface TaskActionsProps {
  * TaskActions component handles task action buttons with loading states and feedback
  */
 export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -96,8 +96,8 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
       setSuccessMessage("Task execution started successfully!");
       setIsExecuting(false);
       
-      // Refresh the page to show updated status
-      router.refresh();
+      // Reload the page to show updated status
+      window.location.reload();
       
       // Clear success message after a delay
       setTimeout(() => {
@@ -124,7 +124,8 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
         return;
       }
 
-      router.refresh();
+      // Reload to show updated status
+      window.location.reload();
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
     }
@@ -145,7 +146,8 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
         return;
       }
 
-      router.refresh();
+      // Reload to show updated status
+      window.location.reload();
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
     }

@@ -2,7 +2,7 @@
 
 import { GitIngestReport as GitIngestReportType } from "@/lib/gitingest/client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+// Router not needed - using window.location.reload() instead
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -21,7 +21,6 @@ export function GitIngestReport({
   repoId,
 }: GitIngestReportProps) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const router = useRouter();
 
   // Use Convex real-time subscription to get live updates
   const repo = useQuery(api.repos.getRepoById, {
@@ -132,7 +131,7 @@ export function GitIngestReport({
             </div>
           </div>
           <button
-            onClick={() => router.refresh()}
+            onClick={() => window.location.reload()}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium"
           >
             View Report

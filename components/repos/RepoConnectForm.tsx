@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "@tanstack/react-router";
 
 interface RepoConnectFormProps {
   onSuccess?: (repoId: string) => void;
@@ -12,7 +12,7 @@ interface RepoConnectFormProps {
  * Allows users to connect a GitHub repository by URL
  */
 export function RepoConnectForm({ onSuccess }: RepoConnectFormProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("");
   const [error, setError] = useState("");
@@ -60,9 +60,9 @@ export function RepoConnectForm({ onSuccess }: RepoConnectFormProps) {
       if (onSuccess) {
         onSuccess(data.repoId);
       } else {
-        router.push(data.next || `/repos/${data.repoId}`);
+        const nextPath = data.next || `/repos/${data.repoId}`
+        navigate({ to: nextPath })
       }
-      router.refresh();
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
     } finally {

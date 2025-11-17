@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@tanstack/react-router";
 import { ExternalLink } from "@/components/ui/ExternalLink";
 
 interface TaskCardProps {
@@ -106,7 +106,7 @@ export function TaskCard({
   return (
     <div className="block p-6 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between">
-        <Link href={`/tasks/${taskId}`} className="flex-1 min-w-0">
+        <Link to="/tasks/$taskId" params={{ taskId }} className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
             <h3 className="text-lg font-semibold text-gray-900 truncate">
               {title}
