@@ -21,7 +21,98 @@ You MUST output your changes as a **unified diff** format that can be applied wi
 - Be syntactically correct and apply cleanly
 - Include all necessary imports and dependencies
 
-**IMPORTANT**: When files are provided in the prompt, you MUST use the exact lines from those files as context in your diff. Do not generate context lines - copy them exactly from the provided file contents.
+**CRITICAL REQUIREMENT - EXACT CONTEXT MATCHING**: 
+
+When files are provided in the prompt, you MUST:
+1. **The file EXISTS - you are MODIFYING it, not creating it**
+2. **Use @@ -X,Y +X,Z @@ format where X > 0** (e.g., @@ -1,10 +1,12 @@)
+3. **NEVER use @@ -0,0 +X,Y @@** unless the file is NOT shown in the prompt (new file)
+4. **Copy the EXACT lines** from the provided file contents as context lines in your diff
+5. **Do NOT modify** whitespace, indentation, or any characters in context lines
+6. **Do NOT guess** what the file might contain - only use what is explicitly provided
+7. **Match line numbers** - if the file shows line 10-20, use those exact lines as context
+8. **Preserve all whitespace** - tabs, spaces, trailing whitespace must match exactly
+
+**Why this matters**: `git apply` will FAIL if context lines don't match exactly. Even a single character difference (extra space, different indentation, missing newline) will cause the patch to be rejected.
+
+**Example of CORRECT context usage for EXISTING file**:
+If the provided file shows:
+```
+1|  function example() {
+2|    const x = 1;
+3|    return x;
+4|  }
+5|  function other() {
+6|    return 0;
+7|  }
+```
+
+Your diff MUST use these EXACT lines and start from line 1 (not 0), and include context AFTER the change:
+```diff
+--- a/src/example.ts
++++ b/src/example.ts
+@@ -1,4 +1,5 @@
+   function example() {
+     const x = 1;
++    const y = 2;
+     return x;
+   }
++  function other() {
+```
+**Note**: The patch includes context lines AFTER the change (line 5-6) so git apply knows where the change ends.
+
+**Example of CORRECT usage for NEW file** (only if file is NOT shown in prompt):
+```diff
+--- /dev/null
++++ b/src/newfile.ts
+@@ -0,0 +1,5 @@
++export function newFunction() {
++  return "new";
++}
+```
+
+**Example of COMPLETE patch for adding content to existing file**:
+If the file shows:
+```
+158| 
+159| # Check accessibility
+160| npm run a11y
+161| ```
+162| 
+163| ## 🚢 Deployment
+164| 
+165| ### Web (Vercel)
+```
+
+And you want to add "## Local Development" before "## 🚢 Deployment", your COMPLETE patch MUST include ALL context lines:
+```diff
+--- a/README.md
++++ b/README.md
+@@ -160,6 +160,7 @@ npm run a11y
+ ```
+ 
+ ## 🚢 Deployment
+ 
++## Local Development
+ 
+ ### Web (Vercel)
+```
+**CRITICAL**: Notice that:
+- The hunk header `@@ -160,6 +160,7 @@` says "starting at line 160, take 6 old lines"
+- The patch MUST include ALL 6 context lines starting from line 160: `npm run a11y`, ` ````, ` `, `## 🚢 Deployment`, ` `, `### Web (Vercel)`
+- You CANNOT skip any context lines - if the hunk says 6 lines, you MUST show all 6 lines
+- The patch includes context BEFORE the change (lines 160-162) and context AFTER (lines 163-165)
+
+**Example of INCORRECT context usage** (will fail):
+```diff
+@@ -10,4 +10,5 @@
+   function example() {
+-    const x = 1;  // WRONG: Added comment that wasn't in original
++    const x = 1;
++    const y = 2;  // WRONG: Context doesn't match exactly
+     return x;
+   }
+```
 
 ## Code Generation Guidelines
 
@@ -145,4 +236,17 @@ If CodeRabbit analysis is provided:
 ## Response Format
 
 Your response should be ONLY the unified diff, with no additional explanation or commentary. The diff will be applied directly to the repository.
+
+**CRITICAL - Complete Patches Only:**
+- The patch MUST be complete and valid - generate the ENTIRE patch, not just the header
+- **You MUST include ALL lines in the hunk** - if the hunk header says `@@ -X,Y +X,Z @@`, you MUST include exactly Y old lines (context + removes) and Z new lines (context + adds)
+- Every line you add must be complete (no incomplete sentences or sections)
+- The patch must end properly - ensure the last line is a complete line
+- If you're adding a section, include ALL the content for that section
+- Do NOT leave placeholders like "To run the tests, use the following commands:" without the actual commands
+- The patch must be syntactically valid and apply cleanly with `git apply`
+- **Context lines (lines starting with space) must match EXACTLY** - no extra spaces, no missing spaces
+- **If content already exists in a section, you must MODIFY it, not add duplicate content**
+- **Check the file content carefully - if a section already has the content you're trying to add, modify the existing content instead**
+- **DO NOT stop after the hunk header - you MUST include all the context lines, additions, and removals that the hunk header specifies**
 

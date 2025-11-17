@@ -8,10 +8,14 @@
  */
 
 import { Daytona, Image } from "@daytonaio/sdk";
+import { buildPithyJauntImage } from "./declarative-image";
 
-const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "butlerjake/pithy-jaunt-daytona:v1.0.2";
-// The snapshot name is the same as the Docker image name
-const DAYTONA_IMAGE_NAME = process.env.DAYTONA_IMAGE_NAME || "butlerjake/pithy-jaunt-daytona:v1.0.2";
+// Use declarative images by default (more scalable and flexible)
+// Set DAYTONA_USE_DECLARATIVE_IMAGE=false to use pre-built snapshots
+const USE_DECLARATIVE_IMAGE = process.env.DAYTONA_USE_DECLARATIVE_IMAGE !== "false";
+
+// Fallback to snapshot name if not using declarative images
+const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "butlerjake/pithy-jaunt-daytona:v1.0.4";
 
 interface CreateWorkspaceParams {
   repoUrl: string;
@@ -62,38 +66,65 @@ export async function createWorkspaceViaSDK(
   };
 
   try {
-    // Use snapshot approach - CreateSandboxFromSnapshotParams
-    // The snapshot name should be the name registered in Daytona (e.g., "pithy-jaunt-dev")
-    console.log("[Daytona SDK] Creating workspace with snapshot:", DAYTONA_SNAPSHOT_NAME);
+    let sandbox;
     
-    // First, try to verify the snapshot exists (optional check)
-    try {
-      const snapshotList = await daytona.snapshot.list();
-      const snapshotExists = snapshotList.items.some((s: any) => s.name === DAYTONA_SNAPSHOT_NAME);
-      console.log("[Daytona SDK] Snapshot check:", {
-        snapshotName: DAYTONA_SNAPSHOT_NAME,
-        exists: snapshotExists,
-        availableSnapshots: snapshotList.items.map((s: any) => s.name),
-      });
+    if (USE_DECLARATIVE_IMAGE) {
+      // Use declarative image (recommended - more scalable and flexible)
+      console.log("[Daytona SDK] Creating workspace with declarative image...");
+      console.log("[Daytona SDK] Image will be built on-demand and cached for 24 hours");
       
-      if (!snapshotExists) {
-        console.warn(`[Daytona SDK] ⚠️ Snapshot "${DAYTONA_SNAPSHOT_NAME}" not found!`);
-        console.warn(`[Daytona SDK] Available snapshots:`, snapshotList.items.map((s: any) => s.name));
-        console.warn(`[Daytona SDK] Will attempt to create anyway - SDK may use default if snapshot doesn't exist`);
+      const declarativeImage = buildPithyJauntImage();
+      
+      // Create workspace with declarative image
+      // Daytona will build the image on-demand and cache it for 24 hours
+      sandbox = await daytona.create(
+        {
+          image: declarativeImage,
+          envVars,
+        },
+        {
+          // Stream build logs if available
+          onSnapshotCreateLogs: (log: string) => {
+            console.log("[Daytona SDK] Build log:", log);
+          },
+        }
+      );
+      
+      console.log("[Daytona SDK] Workspace created with declarative image");
+    } else {
+      // Use pre-built snapshot (fallback)
+      console.log("[Daytona SDK] Creating workspace with snapshot:", DAYTONA_SNAPSHOT_NAME);
+      
+      // First, try to verify the snapshot exists (optional check)
+      try {
+        const snapshotList = await daytona.snapshot.list();
+        const snapshotExists = snapshotList.items.some((s: any) => s.name === DAYTONA_SNAPSHOT_NAME);
+        console.log("[Daytona SDK] Snapshot check:", {
+          snapshotName: DAYTONA_SNAPSHOT_NAME,
+          exists: snapshotExists,
+          availableSnapshots: snapshotList.items.map((s: any) => s.name),
+        });
+        
+        if (!snapshotExists) {
+          console.warn(`[Daytona SDK] ⚠️ Snapshot "${DAYTONA_SNAPSHOT_NAME}" not found!`);
+          console.warn(`[Daytona SDK] Available snapshots:`, snapshotList.items.map((s: any) => s.name));
+          console.warn(`[Daytona SDK] Will attempt to create anyway - SDK may use default if snapshot doesn't exist`);
+        }
+      } catch (snapshotCheckError: any) {
+        console.warn("[Daytona SDK] Could not verify snapshot existence:", snapshotCheckError.message);
+        // Continue anyway - the create call will fail if snapshot doesn't exist
       }
-    } catch (snapshotCheckError: any) {
-      console.warn("[Daytona SDK] Could not verify snapshot existence:", snapshotCheckError.message);
-      // Continue anyway - the create call will fail if snapshot doesn't exist
+      
+      sandbox = await daytona.create({
+        snapshot: DAYTONA_SNAPSHOT_NAME,
+        envVars,
+      });
     }
-    
-    const sandbox = await daytona.create({
-      snapshot: DAYTONA_SNAPSHOT_NAME,
-      envVars,
-    });
 
     console.log("[Daytona SDK] Workspace created successfully:", {
       workspaceId: sandbox.id,
-      snapshotUsed: DAYTONA_SNAPSHOT_NAME,
+      imageType: USE_DECLARATIVE_IMAGE ? "declarative" : "snapshot",
+      snapshotUsed: USE_DECLARATIVE_IMAGE ? "N/A (declarative)" : DAYTONA_SNAPSHOT_NAME,
     });
 
     // Execute the execution script in the workspace

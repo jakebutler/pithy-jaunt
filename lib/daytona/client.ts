@@ -32,7 +32,7 @@ export async function createWorkspace(params: {
   branch: string;
   taskId: string;
   taskDescription: string;
-  modelProvider: "openai" | "anthropic";
+  modelProvider: "openai" | "anthropic" | "openrouter";
   model: string;
   keepWorkspaceAlive?: boolean;
 }): Promise<{
@@ -98,6 +98,7 @@ export async function createWorkspace(params: {
       AGENT_PROMPT: params.taskDescription,
       OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
       ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
+      OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",
       GITHUB_TOKEN: process.env.GITHUB_TOKEN || "",
       MODEL_PROVIDER: params.modelProvider,
       MODEL: params.model,

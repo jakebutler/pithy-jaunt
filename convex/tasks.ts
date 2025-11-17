@@ -15,7 +15,7 @@ export const createTask = mutation({
     initiator: v.union(v.literal("user"), v.literal("coderabbit")),
     modelPreference: v.optional(
       v.object({
-        provider: v.union(v.literal("openai"), v.literal("anthropic")),
+        provider: v.union(v.literal("openai"), v.literal("anthropic"), v.literal("openrouter")),
         model: v.string(),
       })
     ),
@@ -33,8 +33,8 @@ export const createTask = mutation({
       initiator: args.initiator,
       modelPreference:
         args.modelPreference || {
-          provider: "openai",
-          model: "gpt-4o",
+          provider: "openrouter",
+          model: "moonshotai/kimi-k2-0905",
         },
       createdAt: now,
       updatedAt: now,

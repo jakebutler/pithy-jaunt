@@ -4,6 +4,8 @@ import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { createWorkspace, isDaytonaConfigured } from "@/lib/daytona/client";
+import { enhanceTaskPrompt } from "@/lib/task/prompt-enhancer";
+import { GitIngestReport } from "@/lib/gitingest/client";
 
 /**
  * POST /api/task/[taskId]/execute
@@ -180,6 +182,25 @@ export async function POST(
       );
     }
 
+    // Get GitIngest report if available
+    const gitingestReport: GitIngestReport | null = 
+      repo.gitingestReportStatus === "completed" && repo.gitingestReport
+        ? (repo.gitingestReport as any as GitIngestReport)
+        : null;
+
+    // Enhance task description with GitIngest report data
+    const enhancedPrompt = enhanceTaskPrompt(
+      task.description,
+      gitingestReport
+    );
+
+    console.log("[TASK EXECUTE] Enhanced prompt:", {
+      originalLength: task.description.length,
+      enhancedLength: enhancedPrompt.enhancedDescription.length,
+      suggestedFiles: enhancedPrompt.suggestedFiles.length,
+      hasReport: !!gitingestReport,
+    });
+
     // Update task status to running
     await convexClient.mutation(api.tasks.updateTaskStatus, {
       taskId: task._id,
@@ -187,12 +208,12 @@ export async function POST(
     });
 
     try {
-      // Create Daytona workspace
+      // Create Daytona workspace with enhanced prompt
       const workspace = await createWorkspace({
         repoUrl: repo.url,
         branch: repo.branch,
         taskId: task._id,
-        taskDescription: task.description,
+        taskDescription: enhancedPrompt.enhancedDescription,
         modelProvider: task.modelPreference.provider,
         model: task.modelPreference.model,
         keepWorkspaceAlive: keepWorkspaceAlive,

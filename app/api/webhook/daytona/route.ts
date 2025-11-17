@@ -26,15 +26,42 @@ export async function POST(request: Request) {
     //   return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     // }
 
-    const body = await request.json();
+    // Read raw body first to see what we're actually receiving
+    const rawBody = await request.text();
+    console.log("[Daytona Webhook] ========== RAW WEBHOOK BODY ==========");
+    console.log(rawBody);
+    console.log("[Daytona Webhook] Body length:", rawBody.length);
+    console.log("[Daytona Webhook] ======================================");
+    
+    let body;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (parseError) {
+      console.error("[Daytona Webhook] Failed to parse JSON:", parseError);
+      console.error("[Daytona Webhook] Raw body:", rawBody);
+      return NextResponse.json(
+        { error: "Invalid JSON in webhook body" },
+        { status: 400 }
+      );
+    }
 
     console.log("[Daytona Webhook] Received webhook:", {
       type: body.type,
       taskId: body.taskId,
       workspaceId: body.workspaceId,
+      error: body.error,
+      message: body.message,
+      status: body.status,
       timestamp: new Date().toISOString(),
-      headers: Object.fromEntries(request.headers.entries()),
+      hasMessage: !!body.message,
+      messageLength: body.message ? body.message.length : 0,
+      fullBody: JSON.stringify(body, null, 2),
     });
+    
+    // Log full body separately for better visibility in logs
+    console.log("[Daytona Webhook] ========== FULL WEBHOOK PAYLOAD ==========");
+    console.log(JSON.stringify(body, null, 2));
+    console.log("[Daytona Webhook] ==========================================");
 
     // Handle workspace creation (from GitHub Actions)
     if (body.type === "workspace.created") {
@@ -258,13 +285,31 @@ export async function POST(request: Request) {
 
     // Handle execution failure
     if (body.type === "task.failed") {
-      const { workspaceId, taskId, error, status } = body;
+      const { workspaceId, taskId, error, status, message } = body;
+      // Use message field as details if provided
+      const details = message || "";
 
       console.log("[Daytona Webhook] Task failed:", {
         taskId,
         workspaceId,
         error,
+        message,
+        details,
+        hasMessage: !!message,
+        messageLength: message ? message.length : 0,
+        messagePreview: message ? message.substring(0, 500) : "NO MESSAGE FIELD",
       });
+      
+      // Log full error details for debugging
+      if (message) {
+        console.log("[Daytona Webhook] ========== FULL ERROR MESSAGE ==========");
+        console.log(message);
+        console.log("[Daytona Webhook] ========================================");
+      } else {
+        console.warn("[Daytona Webhook] ⚠️ WARNING: No 'message' field in webhook payload!");
+        console.warn("[Daytona Webhook] This suggests the old Docker image is being used.");
+        console.warn("[Daytona Webhook] Please verify DAYTONA_SNAPSHOT_NAME is set to the latest image.");
+      }
 
       // Get task directly
       const task = await convexClient.query(api.tasks.getTaskById, {
@@ -279,12 +324,49 @@ export async function POST(request: Request) {
         );
       }
 
+      // Combine error information
+      const errorMessage = error || message || "Unknown error";
+      const fullErrorDetails = details 
+        ? `${errorMessage}\n\nDetails:\n${details}`
+        : errorMessage;
+
       // Determine if it's a patch failure (needs_review) or other failure
-      const errorMessage = error || "";
       const isPatchFailure =
-        errorMessage.includes("patch") ||
-        errorMessage.includes("apply") ||
-        errorMessage.includes("conflict");
+        errorMessage.toLowerCase().includes("patch") ||
+        errorMessage.toLowerCase().includes("apply") ||
+        errorMessage.toLowerCase().includes("conflict") ||
+        errorMessage.toLowerCase().includes("context") ||
+        errorMessage.toLowerCase().includes("does not exist") ||
+        errorMessage.toLowerCase().includes("malformed") ||
+        (details && (
+          details.toLowerCase().includes("patch") ||
+          details.toLowerCase().includes("apply") ||
+          details.toLowerCase().includes("git apply")
+        ));
+
+      // Determine error category for better debugging
+      let errorCategory = "unknown";
+      if (isPatchFailure) {
+        if (errorMessage.toLowerCase().includes("context") || errorMessage.toLowerCase().includes("does not match")) {
+          errorCategory = "patch_context_mismatch";
+        } else if (errorMessage.toLowerCase().includes("does not exist")) {
+          errorCategory = "patch_file_not_found";
+        } else if (errorMessage.toLowerCase().includes("malformed")) {
+          errorCategory = "patch_format_error";
+        } else {
+          errorCategory = "patch_apply_failed";
+        }
+      } else if (errorMessage.toLowerCase().includes("timeout")) {
+        errorCategory = "timeout";
+      } else if (errorMessage.toLowerCase().includes("agent") || errorMessage.toLowerCase().includes("llm")) {
+        errorCategory = "agent_error";
+      }
+
+      console.log("[Daytona Webhook] Error analysis:", {
+        isPatchFailure,
+        errorCategory,
+        errorMessage: errorMessage.substring(0, 200), // Log first 200 chars
+      });
 
       // Update task status
       await convexClient.mutation(api.tasks.updateTaskStatus, {
@@ -292,14 +374,17 @@ export async function POST(request: Request) {
         status: isPatchFailure ? "needs_review" : "failed",
       });
 
-      // Store error in execution logs if available
+      // Store error in execution logs with detailed information
       try {
+        const logMessage = `[${errorCategory}] ${fullErrorDetails}`;
         await convexClient.mutation(api.executionLogs.createLog, {
           taskId: task._id,
           workspaceId: workspaceId || task.assignedWorkspaceId || "",
-          logs: `Error: ${errorMessage}`,
+          logs: logMessage,
           status: "failed",
-          error: errorMessage,
+          error: fullErrorDetails.length > 10000 
+            ? fullErrorDetails.substring(0, 10000) + "\n... (truncated)"
+            : fullErrorDetails,
         });
       } catch (logError) {
         console.warn("[Daytona Webhook] Failed to store error logs:", logError);

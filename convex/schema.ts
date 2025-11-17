@@ -67,7 +67,7 @@ export default defineSchema({
     ),
     initiator: v.union(v.literal("user"), v.literal("coderabbit")),
     modelPreference: v.object({
-      provider: v.union(v.literal("openai"), v.literal("anthropic")),
+      provider: v.union(v.literal("openai"), v.literal("anthropic"), v.literal("openrouter")),
       model: v.string(),
     }),
     assignedWorkspaceId: v.optional(v.string()),
