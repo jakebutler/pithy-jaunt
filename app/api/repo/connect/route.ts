@@ -1,11 +1,9 @@
 import { createClient } from "@/lib/auth/supabase-server";
 import { NextResponse } from "next/server";
-import { validateRepository, hasCodeRabbitConfig } from "@/lib/github/validation";
+import { validateRepository } from "@/lib/github/validation";
 import { fetchRepositoryMetadata } from "@/lib/github/metadata";
 import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
-import { triggerRepositoryAnalysis } from "@/lib/coderabbit/client";
-import { sendCodeRabbitNotInstalledEmail } from "@/lib/email/sender";
 import { triggerGitIngestReport } from "@/lib/gitingest/client";
 import { Id } from "@/convex/_generated/dataModel";
 
@@ -97,13 +95,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check for CodeRabbit config
-    const coderabbitDetected = await hasCodeRabbitConfig(
-      validation.owner,
-      validation.repo,
-      targetBranch
-    );
-
     // Create repository record in Convex
     const repoId = await convexClient.mutation(api.repos.createRepo, {
       userId: convexUser._id,
@@ -111,7 +102,7 @@ export async function POST(request: Request) {
       owner: metadata.owner,
       name: metadata.name,
       branch: targetBranch,
-      coderabbitDetected,
+      coderabbitDetected: false, // CodeRabbit integration disabled for now
     });
 
     // Initialize GitIngest report status
@@ -119,34 +110,6 @@ export async function POST(request: Request) {
       repoId,
       status: "pending",
     });
-
-    // Trigger CodeRabbit analysis asynchronously
-    // MVP: Webhook-only approach (no polling)
-    try {
-      const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/webhook/coderabbit`;
-      
-      await convexClient.mutation(api.repos.updateRepoAnalysis, {
-        repoId,
-        analyzerStatus: "analyzing",
-      });
-
-      // TODO: Uncomment once CodeRabbit API is implemented
-      // await triggerRepositoryAnalysis({
-      //   repoUrl: metadata.url,
-      //   owner: metadata.owner,
-      //   repo: metadata.name,
-      //   branch: targetBranch,
-      //   webhookUrl,
-      // });
-    } catch (error) {
-      // Log error but don't fail the connection
-      console.error("Failed to trigger CodeRabbit analysis:", error);
-      // Set status to pending - can be retried later
-      await convexClient.mutation(api.repos.updateRepoAnalysis, {
-        repoId,
-        analyzerStatus: "pending",
-      });
-    }
 
     // Trigger GitIngest report generation asynchronously
     // Non-blocking: repo connection succeeds even if GitIngest fails
@@ -177,26 +140,12 @@ export async function POST(request: Request) {
       });
     }
 
-    // Send email notification if CodeRabbit is not installed
-    if (!coderabbitDetected && user.email) {
-      // Send email asynchronously - don't block the response
-      sendCodeRabbitNotInstalledEmail({
-        to: user.email,
-        repoName: metadata.name,
-        userName: user.user_metadata?.name || user.user_metadata?.full_name,
-      }).catch((error) => {
-        // Log error but don't fail the repository connection
-        console.error("Failed to send CodeRabbit email notification:", error);
-      });
-    }
-
     // Return success response
     return NextResponse.json(
       {
         repoId,
         repoUrl: metadata.url,
-        coderabbitDetected,
-        status: "analyzing",
+        status: "connected",
         next: `/repos/${repoId}`,
       },
       { status: 202 }

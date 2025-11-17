@@ -3,7 +3,6 @@ import { redirect, notFound } from "next/navigation";
 import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { CodeRabbitReport } from "@/components/repos/CodeRabbitReport";
 import { GitIngestReport } from "@/components/repos/GitIngestReport";
 import Link from "next/link";
 import { ExternalLink } from "@/components/ui/ExternalLink";
@@ -118,23 +117,9 @@ export default async function RepoDetailPage({
                 </p>
                 <div className="flex items-center gap-4 mt-4 text-sm text-gray-600">
                   <span>Branch: {repo.branch}</span>
-                  {repo.coderabbitDetected && (
-                    <span className="text-green-600">CodeRabbit configured</span>
-                  )}
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* CodeRabbit Analysis Report */}
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              CodeRabbit Analysis
-            </h2>
-            <CodeRabbitReport
-              status={repo.analyzerStatus}
-              report={report || undefined}
-            />
           </div>
 
           {/* GitIngest Report */}
