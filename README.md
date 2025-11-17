@@ -1,5 +1,7 @@
 # Pithy Jaunt
 
+<!-- Deployment test: Vercel ignore build step verification -->
+
 > Transform natural language into working pull requests with AI-powered DevOps automation
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
