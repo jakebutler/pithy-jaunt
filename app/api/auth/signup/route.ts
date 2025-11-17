@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/auth/supabase-server";
 import { NextResponse } from "next/server";
 import { convexClient } from "@/lib/convex/server";
+import { validateEmail } from "@/lib/utils/validation";
 
 /**
  * POST /api/auth/signup
@@ -15,6 +16,15 @@ export async function POST(request: Request) {
     if (!email || !password) {
       return NextResponse.json(
         { error: "Email and password are required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate email format using zod
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.success) {
+      return NextResponse.json(
+        { error: "Invalid email format" },
         { status: 400 }
       );
     }
@@ -76,4 +86,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
