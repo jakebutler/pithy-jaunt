@@ -15,14 +15,54 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // Get user from Convex
-  const convexUser = await convexClient.query(
+  // Get user from Convex, create if doesn't exist
+  let convexUser = await convexClient.query(
     api.users.getUserBySupabaseId,
     { supabaseUserId: user.id }
   );
 
+  // If user doesn't exist in Convex, create them
+  // This can happen when switching Convex deployments
   if (!convexUser) {
-    redirect("/login");
+    try {
+      const userId = await convexClient.mutation(api.users.upsertUser, {
+        supabaseUserId: user.id,
+        email: user.email || "",
+      });
+      // Fetch the newly created user
+      convexUser = await convexClient.query(
+        api.users.getUserBySupabaseId,
+        { supabaseUserId: user.id }
+      );
+      if (!convexUser) {
+        // Still not found after creation, something is wrong
+        throw new Error("Failed to create or retrieve Convex user");
+      }
+    } catch (error) {
+      console.error("Error creating Convex user:", error);
+      // Return error page instead of redirecting to avoid loop
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">
+              Setup Required
+            </h1>
+            <p className="text-gray-600 mb-4">
+              Your account needs to be set up in our system. Please try refreshing
+              the page, or contact support if the issue persists.
+            </p>
+            <form action="/api/auth/logout" method="POST">
+              <button
+                type="submit"
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
+              >
+                Sign Out and Try Again
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
   }
 
   // Fetch user's repositories
