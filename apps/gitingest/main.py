@@ -8,7 +8,7 @@ import logging
 from typing import Optional
 from datetime import datetime
 
-from fastapi import FastAPI, Header, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Header, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
 import httpx
@@ -226,11 +226,10 @@ async def health_check():
     }
 
 
-@app.post("/ingest", response_model=IngestResponse, dependencies=[verify_api_key])
+@app.post("/ingest", response_model=IngestResponse, dependencies=[Depends(verify_api_key)])
 async def ingest(
     request: IngestRequest,
     background_tasks: BackgroundTasks,
-    authorization: Optional[str] = Header(None)
 ):
     """
     Generate LLM-friendly repository report
@@ -238,8 +237,6 @@ async def ingest(
     Accepts repository URL and branch, returns job ID for async processing.
     Results are delivered via webhook callback.
     """
-    # Verify API key
-    await verify_api_key(authorization)
     
     # Validate repository URL
     repo_url = str(request.repoUrl)
@@ -278,11 +275,9 @@ async def ingest(
     )
 
 
-@app.get("/job/{job_id}")
-async def get_job_status(job_id: str, authorization: Optional[str] = Header(None)):
+@app.get("/job/{job_id}", dependencies=[Depends(verify_api_key)])
+async def get_job_status(job_id: str):
     """Get job status (for debugging/monitoring)"""
-    await verify_api_key(authorization)
-    
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
     
