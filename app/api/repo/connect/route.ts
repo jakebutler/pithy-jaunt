@@ -6,6 +6,7 @@ import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
 import { triggerRepositoryAnalysis } from "@/lib/coderabbit/client";
 import { sendCodeRabbitNotInstalledEmail } from "@/lib/email/sender";
+import { triggerGitIngestReport } from "@/lib/gitingest/client";
 import { Id } from "@/convex/_generated/dataModel";
 
 /**
@@ -113,6 +114,12 @@ export async function POST(request: Request) {
       coderabbitDetected,
     });
 
+    // Initialize GitIngest report status
+    await convexClient.mutation(api.repos.updateGitIngestReport, {
+      repoId,
+      status: "pending",
+    });
+
     // Trigger CodeRabbit analysis asynchronously
     // MVP: Webhook-only approach (no polling)
     try {
@@ -138,6 +145,35 @@ export async function POST(request: Request) {
       await convexClient.mutation(api.repos.updateRepoAnalysis, {
         repoId,
         analyzerStatus: "pending",
+      });
+    }
+
+    // Trigger GitIngest report generation asynchronously
+    // Non-blocking: repo connection succeeds even if GitIngest fails
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const callbackUrl = `${appUrl}/api/repo/gitingest-callback`;
+
+      // Update status to processing
+      await convexClient.mutation(api.repos.updateGitIngestReport, {
+        repoId,
+        status: "processing",
+      });
+
+      // Trigger GitIngest service
+      await triggerGitIngestReport({
+        repoUrl: metadata.url,
+        branch: targetBranch,
+        callbackUrl,
+      });
+    } catch (error) {
+      // Log error but don't fail the connection
+      console.error("Failed to trigger GitIngest report generation:", error);
+      // Set status to pending - can be retried later
+      await convexClient.mutation(api.repos.updateGitIngestReport, {
+        repoId,
+        status: "pending",
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
 

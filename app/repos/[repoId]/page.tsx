@@ -4,6 +4,7 @@ import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { CodeRabbitReport } from "@/components/repos/CodeRabbitReport";
+import { GitIngestReport } from "@/components/repos/GitIngestReport";
 import Link from "next/link";
 import { ExternalLink } from "@/components/ui/ExternalLink";
 
@@ -133,6 +134,19 @@ export default async function RepoDetailPage({
             <CodeRabbitReport
               status={repo.analyzerStatus}
               report={report || undefined}
+            />
+          </div>
+
+          {/* GitIngest Report */}
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              Repository Report
+            </h2>
+            <GitIngestReport
+              status={repo.gitingestReportStatus || "pending"}
+              report={repo.gitingestReport || undefined}
+              error={repo.gitingestReportError || undefined}
+              repoId={repo._id}
             />
           </div>
 

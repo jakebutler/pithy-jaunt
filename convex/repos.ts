@@ -35,6 +35,7 @@ export const createRepo = mutation({
       branch: args.branch,
       analyzerStatus: "pending",
       coderabbitDetected: args.coderabbitDetected,
+      gitingestReportStatus: "pending",
       createdAt: now,
     });
   },
@@ -157,6 +158,50 @@ export const deleteAllReposForUser = mutation({
     }
 
     return { deleted: repos.length };
+  },
+});
+
+/**
+ * Update GitIngest report status and data
+ */
+export const updateGitIngestReport = mutation({
+  args: {
+    repoId: v.id("repos"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    report: v.optional(v.any()),
+    error: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const repo = await ctx.db.get(args.repoId);
+    if (!repo) {
+      throw new Error("Repository not found");
+    }
+
+    const updateData: {
+      gitingestReportStatus: typeof args.status;
+      gitingestReport?: any;
+      gitingestReportGeneratedAt?: number;
+      gitingestReportError?: string;
+    } = {
+      gitingestReportStatus: args.status,
+    };
+
+    if (args.status === "completed" && args.report) {
+      updateData.gitingestReport = args.report;
+      updateData.gitingestReportGeneratedAt = Date.now();
+      updateData.gitingestReportError = undefined;
+    } else if (args.status === "failed" && args.error) {
+      updateData.gitingestReportError = args.error;
+    } else if (args.status === "processing") {
+      updateData.gitingestReportError = undefined;
+    }
+
+    await ctx.db.patch(args.repoId, updateData);
   },
 });
 
