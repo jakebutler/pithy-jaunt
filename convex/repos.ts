@@ -162,6 +162,22 @@ export const deleteAllReposForUser = mutation({
 });
 
 /**
+ * Delete all repositories (admin function)
+ */
+export const deleteAllRepos = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const repos = await ctx.db.query("repos").collect();
+
+    for (const repo of repos) {
+      await ctx.db.delete(repo._id);
+    }
+
+    return { deleted: repos.length };
+  },
+});
+
+/**
  * Update GitIngest report status and data
  */
 export const updateGitIngestReport = mutation({
