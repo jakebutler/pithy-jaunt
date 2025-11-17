@@ -1,11 +1,62 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import jwt from "jsonwebtoken";
 
 /**
  * Middleware to handle authentication and session refresh
  * Protects routes that require authentication
  */
 export async function middleware(request: NextRequest) {
+  // Check for JWT token in Authorization header for API routes
+  const authHeader = request.headers.get("Authorization");
+  const isApiRoute = request.nextUrl.pathname.startsWith("/api/");
+  
+  if (isApiRoute && authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.substring(7); // Remove "Bearer " prefix
+    
+    try {
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
+        console.error("Missing JWT_SECRET environment variable");
+        return new NextResponse(
+          JSON.stringify({
+            error: "Server configuration error",
+            message: "Missing JWT_SECRET environment variable",
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+      
+      // Verify the JWT token
+      const decoded = jwt.verify(token, jwtSecret) as { userId: string };
+      
+      // Add user ID to request headers for downstream handlers
+      const requestHeaders = new Headers(request.headers);
+      requestHeaders.set("x-user-id", decoded.userId);
+      
+      return NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      });
+    } catch (error) {
+      console.error("JWT verification failed:", error);
+      return new NextResponse(
+        JSON.stringify({
+          error: "Unauthorized",
+          message: "Invalid or expired token",
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+  }
+  
   // Check for required environment variables
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -113,4 +164,3 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
-
