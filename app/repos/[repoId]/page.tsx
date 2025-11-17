@@ -129,7 +129,11 @@ export default async function RepoDetailPage({
             </h2>
             <GitIngestReport
               status={repo.gitingestReportStatus || "pending"}
-              report={repo.gitingestReport || undefined}
+              report={
+                repo.gitingestReport && typeof repo.gitingestReport === "object"
+                  ? (repo.gitingestReport as any)
+                  : undefined
+              }
               error={repo.gitingestReportError || undefined}
               repoId={repo._id}
             />

@@ -1,7 +1,8 @@
 "use client";
 
 import { GitIngestReport as GitIngestReportType } from "@/lib/gitingest/client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface GitIngestReportProps {
   status: "pending" | "processing" | "completed" | "failed";
@@ -17,6 +18,21 @@ export function GitIngestReport({
   repoId,
 }: GitIngestReportProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const router = useRouter();
+
+  // Poll for updates when status is "processing"
+  useEffect(() => {
+    if (status !== "processing") {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      // Refresh the page data by revalidating
+      router.refresh();
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [status, router]);
 
   async function handleGenerateReport() {
     setIsGenerating(true);
@@ -116,7 +132,11 @@ export function GitIngestReport({
           {report.generatedAt && (
             <p className="text-sm text-gray-500 mt-1">
               Generated{" "}
-              {new Date(report.generatedAt).toLocaleString()}
+              {new Date(
+                typeof report.generatedAt === "number"
+                  ? report.generatedAt
+                  : parseInt(String(report.generatedAt))
+              ).toLocaleString()}
             </p>
           )}
         </div>
@@ -128,7 +148,7 @@ export function GitIngestReport({
               Summary
             </h4>
             <p className="text-sm text-gray-600 whitespace-pre-wrap">
-              {report.summary}
+              {String(report.summary)}
             </p>
           </div>
         )}
@@ -142,7 +162,11 @@ export function GitIngestReport({
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-gray-500">File Count:</span>{" "}
-                <span className="font-medium">{report.structure.fileCount}</span>
+                <span className="font-medium">
+                  {typeof report.structure.fileCount === "number"
+                    ? report.structure.fileCount
+                    : 0}
+                </span>
               </div>
               {report.structure.languages.length > 0 && (
                 <div>
@@ -177,7 +201,7 @@ export function GitIngestReport({
                 <div>
                   <span className="text-gray-500">Framework:</span>{" "}
                   <span className="font-medium">
-                    {report.patterns.framework}
+                    {String(report.patterns.framework)}
                   </span>
                 </div>
               )}
@@ -185,7 +209,7 @@ export function GitIngestReport({
                 <div>
                   <span className="text-gray-500">Architecture:</span>{" "}
                   <span className="font-medium">
-                    {report.patterns.architecture}
+                    {String(report.patterns.architecture)}
                   </span>
                 </div>
               )}
@@ -219,7 +243,7 @@ export function GitIngestReport({
               <div className="mb-2 text-sm">
                 <span className="text-gray-500">Package Manager:</span>{" "}
                 <span className="font-medium">
-                  {report.dependencies.packageManager}
+                  {String(report.dependencies.packageManager)}
                 </span>
               </div>
             )}
@@ -249,7 +273,7 @@ export function GitIngestReport({
             </h4>
             <div className="bg-gray-50 rounded-md p-3">
               <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono">
-                {report.llmContext}
+                {String(report.llmContext)}
               </pre>
             </div>
           </div>
