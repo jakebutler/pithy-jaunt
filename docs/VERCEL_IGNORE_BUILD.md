@@ -62,22 +62,35 @@ git commit -m "fix: update GitIngest dependencies [skip vercel]"
 
 ## Render Configuration
 
-Render also supports ignoring builds. In your Render service:
+Render also supports ignoring builds. We've created a script similar to the Vercel one:
 
-1. Go to **Settings** → **Build & Deploy**
-2. Under **Build Command**, you can add a check:
+### Setup
 
-```bash
-# Only build if apps/gitingest/ files changed
-if git diff --name-only HEAD~1 | grep -q "^apps/gitingest/"; then
-  pip install --upgrade pip && pip install -r requirements.txt
-else
-  echo "No GitIngest changes, skipping build"
-  exit 0
-fi
-```
+1. Go to your Render service dashboard
+2. Navigate to **Settings** → **Build & Deploy**
+3. Update **Build Command** to:
+   ```
+   ./scripts/render-ignore-build.sh && pip install --upgrade pip && pip install -r requirements.txt
+   ```
+4. Click **Save**
 
-However, Render's auto-deploy is typically fine since it only deploys when files in the root directory change.
+### How It Works
+
+The script (`scripts/render-ignore-build.sh`) checks which files changed:
+- **If files in `apps/gitingest/` changed**: Build runs (exit code 0)
+- **If only files outside `apps/gitingest/` changed**: Build is skipped (exit code 1)
+- **If no changes detected**: Build runs (safety default)
+
+### Why This Is Needed
+
+Even though Render has a "Root Directory" set to `apps/gitingest`, it still watches the entire repository for changes. Without this script, Render would trigger builds on every commit, even if only Next.js app files changed.
+
+### Benefits
+
+- **Saves build minutes**: No unnecessary Render builds
+- **Faster deployments**: Only builds when GitIngest actually changes
+- **Cleaner deployment history**: Only relevant deployments
+- **Cost savings**: Fewer builds = lower costs
 
 ## Benefits
 

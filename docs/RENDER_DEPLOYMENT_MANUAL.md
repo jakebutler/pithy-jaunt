@@ -15,7 +15,9 @@ Since Render requires payment information to create services via API, here are t
 - **Branch**: `main`
 - **Root Directory**: `apps/gitingest`
 - **Runtime**: Python 3 (Render will auto-detect Python 3.11 from `runtime.txt`)
-- **Build Command**: `pip install --upgrade pip && pip install -r requirements.txt`
+- **Build Command**: `./scripts/render-ignore-build.sh && pip install --upgrade pip && pip install -r requirements.txt`
+  
+  **Note**: The script checks if files in `apps/gitingest/` changed. If only files outside this directory changed, the build is skipped.
 - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
 
 ### Plan
