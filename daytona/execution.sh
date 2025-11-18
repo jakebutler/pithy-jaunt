@@ -181,26 +181,54 @@ fi
 # Clone repository
 echo "[pj] Cloning repository: $TARGET_REPO"
 send_webhook "task.progress" "running" "" "" "Cloning repository..." || true  # Send progress update (non-blocking)
-if ! git clone "$TARGET_REPO" repo; then
-  handle_error "Failed to clone repository: $TARGET_REPO"
+
+# Determine base branch BEFORE cloning (use env var if set, otherwise default to main)
+BASE_BRANCH=${BASE_BRANCH:-main}
+
+# Clone with the specific branch if BASE_BRANCH is set and not default
+if [ "$BASE_BRANCH" != "main" ]; then
+  echo "[pj] Cloning repository with branch: $BASE_BRANCH"
+  if ! git clone -b "$BASE_BRANCH" --single-branch "$TARGET_REPO" repo; then
+    echo "[pj] Warning: Failed to clone with branch $BASE_BRANCH, trying default clone..."
+    if ! git clone "$TARGET_REPO" repo; then
+      handle_error "Failed to clone repository: $TARGET_REPO"
+    fi
+  fi
+else
+  if ! git clone "$TARGET_REPO" repo; then
+    handle_error "Failed to clone repository: $TARGET_REPO"
+  fi
 fi
 
 cd repo
 
-# Determine base branch (default to main)
-BASE_BRANCH=${BASE_BRANCH:-main}
+# Fetch latest changes to ensure we have the most up-to-date state
+echo "[pj] Fetching latest changes..."
+git fetch origin || echo "[pj] Warning: Failed to fetch, continuing with existing state"
+
+# Verify and checkout the base branch
 if ! git show-ref --verify --quiet refs/heads/"$BASE_BRANCH"; then
-  # Try master if main doesn't exist
-  if git show-ref --verify --quiet refs/heads/master; then
+  # Try to checkout from remote
+  if git show-ref --verify --quiet refs/remotes/origin/"$BASE_BRANCH"; then
+    echo "[pj] Checking out $BASE_BRANCH from origin..."
+    git checkout -b "$BASE_BRANCH" "origin/$BASE_BRANCH" || git checkout "$BASE_BRANCH"
+  elif git show-ref --verify --quiet refs/heads/master; then
+    echo "[pj] Warning: Branch $BASE_BRANCH not found, falling back to master"
     BASE_BRANCH=master
   else
     # Use the default branch
-    BASE_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+    DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main")
+    echo "[pj] Warning: Branch $BASE_BRANCH not found, using default branch: $DEFAULT_BRANCH"
+    BASE_BRANCH="$DEFAULT_BRANCH"
   fi
 fi
 
 echo "[pj] Base branch: $BASE_BRANCH"
-git checkout "$BASE_BRANCH"
+git checkout "$BASE_BRANCH" || handle_error "Failed to checkout branch: $BASE_BRANCH"
+
+# Pull latest changes to ensure we're up to date
+echo "[pj] Pulling latest changes for branch $BASE_BRANCH..."
+git pull origin "$BASE_BRANCH" || echo "[pj] Warning: Failed to pull, continuing with existing state"
 
 # Create branch
 BRANCH=${BRANCH_NAME:-pj/${TASK_ID}}
@@ -253,11 +281,28 @@ fi
 # Run AI agent to generate patch
 echo "[pj] Running AI agent to generate code changes..."
 echo "[pj] Task description: $AGENT_PROMPT"
+echo "[pj] Current branch: $(git rev-parse --abbrev-ref HEAD)"
+echo "[pj] Current commit: $(git rev-parse HEAD)"
 send_webhook "task.progress" "running" "" "" "Running AI agent to generate code changes..." || true  # Send progress update (non-blocking)
 
 # Use local paths if running outside Docker, otherwise use /app paths
 AGENT_RUNNER="${AGENT_RUNNER_PATH:-/app/agent-runner.py}"
 SYSTEM_PROMPT="${SYSTEM_PROMPT_PATH:-/app/system-prompt.md}"
+
+# CRITICAL: Use two-step approach (read file, generate modified content, then use git diff)
+# This ensures the patch is generated from the actual file contents in the repository
+echo "[pj] Using two-step patch generation approach (reads files first, then generates patch)"
+echo "[pj] Repository state verification:"
+echo "[pj]   - Working directory: $(pwd)"
+echo "[pj]   - Branch: $(git rev-parse --abbrev-ref HEAD)"
+echo "[pj]   - Commit: $(git rev-parse HEAD)"
+echo "[pj]   - Clean working tree: $(git status --porcelain | wc -l) uncommitted changes"
+
+# Verify repository is in a clean state (except for .coderabbit.yaml if we just added it)
+if [ -n "$(git status --porcelain | grep -v '.coderabbit.yaml')" ]; then
+  echo "[pj] Warning: Repository has uncommitted changes (excluding .coderabbit.yaml)"
+  git status --short
+fi
 
 if ! python3 "$AGENT_RUNNER" \
   --prompt-file "$SYSTEM_PROMPT" \
@@ -265,7 +310,8 @@ if ! python3 "$AGENT_RUNNER" \
   --repo-path "$(pwd)" \
   --out /tmp/patch.diff \
   --provider "${MODEL_PROVIDER:-openai}" \
-  --model "${MODEL:-gpt-4o}"; then
+  --model "${MODEL:-gpt-4o}" \
+  --use-two-step; then
   handle_error "AI agent failed to generate patch"
 fi
 

@@ -54,6 +54,7 @@ export async function createWorkspaceViaSDK(
   const envVars: Record<string, string> = {
     TARGET_REPO: params.repoUrl,
     BRANCH_NAME: `pj/${params.taskId}`,
+    BASE_BRANCH: params.branch, // CRITICAL: Pass the actual branch to use
     TASK_ID: params.taskId,
     AGENT_PROMPT: params.taskDescription,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",

@@ -97,6 +97,7 @@ export async function createWorkspace(params: CreateWorkspaceParams): Promise<{
     env: {
       TARGET_REPO: params.repoUrl,
       BRANCH_NAME: `pj/${params.taskId}`,
+      BASE_BRANCH: params.branch, // CRITICAL: Pass the actual branch to use
       TASK_ID: params.taskId,
       AGENT_PROMPT: params.taskDescription,
       OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
