@@ -83,8 +83,25 @@ export async function createWorkspaceViaSDK(
         },
         {
           // Stream build logs if available
-          onSnapshotCreateLogs: (log: string) => {
-            console.log("[Daytona SDK] Build log:", log);
+          // Note: This callback may be called before the runner is ready, so we handle errors gracefully
+          onSnapshotCreateLogs: (log: unknown) => {
+            try {
+              // The log might be a string or an object with error information
+              if (typeof log === 'string') {
+                console.log("[Daytona SDK] Build log:", log);
+              } else if (log && typeof log === 'object') {
+                const logObj = log as { message?: string; error?: string; statusCode?: number };
+                // If it's an error about no runner assigned, just log it as a warning
+                if (logObj.message?.includes("no runner assigned") || logObj.error?.includes("no runner assigned")) {
+                  console.log("[Daytona SDK] Build log stream not available yet (runner not ready):", logObj.message || logObj.error);
+                } else {
+                  console.log("[Daytona SDK] Build log:", log);
+                }
+              }
+            } catch {
+              // Silently ignore errors in log callback - they're not critical
+              // The workspace creation will still succeed even if log streaming fails
+            }
           },
         }
       );
