@@ -1,0 +1,202 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Brand colors */
+  --color-chestnut: #932F29;
+  --color-chestnut-50: #fdf2f2;
+  --color-chestnut-100: #fce6e5;
+  --color-chestnut-200: #f9d0ce;
+  --color-chestnut-300: #f4ada9;
+  --color-chestnut-400: #ed7e78;
+  --color-chestnut-500: #e2554d;
+  --color-chestnut-600: #d13a31;
+  --color-chestnut-700: #932F29;
+  --color-chestnut-800: #7a2823;
+  --color-chestnut-900: #652620;
+  --color-chestnut-950: #36100e;
+  
+  --color-sky-blue: #73C5F3;
+  --color-sky-blue-50: #f0f9ff;
+  --color-sky-blue-100: #e0f2fe;
+  --color-sky-blue-200: #bae6fd;
+  --color-sky-blue-300: #7dd3fc;
+  --color-sky-blue-400: #38bdf8;
+  --color-sky-blue-500: #73C5F3;
+  --color-sky-blue-600: #0284c7;
+  --color-sky-blue-700: #0369a1;
+  --color-sky-blue-800: #075985;
+  --color-sky-blue-900: #0c4a6e;
+  --color-sky-blue-950: #082f49;
+  
+  --color-charcoal: #565555;
+  --color-charcoal-50: #f7f7f7;
+  --color-charcoal-100: #e3e3e3;
+  --color-charcoal-200: #c7c7c7;
+  --color-charcoal-300: #a3a3a3;
+  --color-charcoal-400: #818181;
+  --color-charcoal-500: #565555;
+  --color-charcoal-600: #4a4a4a;
+  --color-charcoal-700: #404040;
+  --color-charcoal-800: #2a2a2a;
+  --color-charcoal-900: #1a1a1a;
+  --color-charcoal-950: #0a0a0a;
+  
+  --color-platinum: #EBEBEB;
+  --color-platinum-50: #fafafa;
+  --color-platinum-100: #f5f5f5;
+  --color-platinum-200: #EBEBEB;
+  --color-platinum-300: #d4d4d4;
+  --color-platinum-400: #a3a3a3;
+  --color-platinum-500: #737373;
+  --color-platinum-600: #525252;
+  --color-platinum-700: #404040;
+  --color-platinum-800: #262626;
+  --color-platinum-900: #171717;
+  --color-platinum-950: #0a0a0a;
+  
+  /* Semantic colors */
+  --color-primary: #73C5F3;
+  --color-primary-light: #bae6fd;
+  --color-primary-dark: #0284c7;
+  
+  --color-secondary: #932F29;
+  --color-secondary-light: #f4ada9;
+  --color-secondary-dark: #7a2823;
+  
+  --color-neutral: #565555;
+  --color-neutral-light: #a3a3a3;
+  --color-neutral-dark: #2a2a2a;
+  
+  --color-success: #10B981;
+  --color-success-light: #6ee7b7;
+  --color-success-dark: #059669;
+  
+  --color-warning: #F59E0B;
+  --color-warning-light: #fcd34d;
+  --color-warning-dark: #d97706;
+  
+  --color-error: #932F29;
+  --color-error-light: #f4ada9;
+  --color-error-dark: #7a2823;
+  
+  --color-info: #73C5F3;
+  --color-info-light: #bae6fd;
+  --color-info-dark: #0284c7;
+}
+
+:root {
+  /* CSS variables for use in components */
+  --chestnut: #932F29;
+  --sky-blue: #73C5F3;
+  --charcoal: #565555;
+  --platinum: #EBEBEB;
+  
+  --primary: var(--sky-blue);
+  --primary-light: #bae6fd;
+  --primary-dark: #0284c7;
+  
+  --secondary: var(--chestnut);
+  --secondary-light: #f4ada9;
+  --secondary-dark: #7a2823;
+  
+  --neutral: var(--charcoal);
+  --neutral-light: #a3a3a3;
+  --neutral-dark: #2a2a2a;
+  
+  --success: #10B981;
+  --success-light: #6ee7b7;
+  --success-dark: #059669;
+  
+  --warning: #F59E0B;
+  --warning-light: #fcd34d;
+  --warning-dark: #d97706;
+  
+  --error: var(--chestnut);
+  --error-light: #f4ada9;
+  --error-dark: #7a2823;
+  
+  --info: var(--sky-blue);
+  --info-light: #bae6fd;
+  --info-dark: #0284c7;
+  
+  /* Legacy support */
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+/* Typography defaults */
+h1 {
+  font-size: 2.5rem;
+  line-height: 3rem;
+  font-weight: 700;
+  color: var(--neutral-dark);
+}
+
+h2 {
+  font-size: 2rem;
+  line-height: 2.5rem;
+  font-weight: 700;
+  color: var(--neutral-dark);
+}
+
+h3 {
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 600;
+  color: var(--neutral-dark);
+}
+
+h4 {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  color: var(--neutral-dark);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+

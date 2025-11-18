@@ -5,8 +5,8 @@ import { cookies } from "next/headers";
  * Creates a Supabase client for server-side operations
  * Uses cookies for session management with proper security settings
  */
-export async function createClient() {
-  const cookieStore = await cookies();
+export function createClient() {
+  const cookieStore = cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

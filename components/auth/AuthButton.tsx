@@ -2,6 +2,8 @@
 
 import { useAuth } from "@/lib/auth/context";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/loading";
 
 /**
  * AuthButton component
@@ -11,28 +13,20 @@ export function AuthButton() {
   const { user, isLoading, signOut } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="h-10 w-20 bg-gray-200 animate-pulse rounded" />
-    );
+    return <Skeleton width="5rem" height="2.5rem" className="rounded-full" />;
   }
 
   if (user) {
     return (
-      <button
-        onClick={() => signOut()}
-        className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-      >
+      <Button variant="outline" onClick={() => signOut()}>
         Sign out
-      </button>
+      </Button>
     );
   }
 
   return (
-    <Link
-      href="/login"
-      className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-    >
-      Sign in
+    <Link href="/login">
+      <Button variant="primary">Sign in</Button>
     </Link>
   );
 }

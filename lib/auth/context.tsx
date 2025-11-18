@@ -1,5 +1,3 @@
-"use client";
-
 import { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "./supabase-client";
 import type { User, Session } from "@supabase/supabase-js";
@@ -28,37 +26,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
+    let mounted = true;
+    console.log('[AuthProvider] useEffect running');
+    
+    // Don't prevent re-initialization - we need to check auth state on every mount
+    // This ensures auth state is checked after login/signup redirects
+    
+    try {
+      const supabase = createClient();
+      console.log('[AuthProvider] Supabase client created');
 
-    // Get initial authenticated user - getUser() verifies with Supabase Auth server
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      // For client-side, we still need session for some features
-      // So we get the session after verifying the user
-      if (user) {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          setSession(session);
-          setUser(user);
+      // Get initial authenticated user - getUser() verifies with Supabase Auth server
+      supabase.auth.getUser().then(({ data: { user }, error }) => {
+        console.log('[AuthProvider] getUser result:', { hasUser: !!user, error: error?.message });
+        if (!mounted) {
+          console.log('[AuthProvider] Component unmounted, skipping state update');
+          return;
+        }
+        
+        // If there's an error (e.g., invalid env vars), just set loading to false
+        if (error) {
+          console.warn('[AuthProvider] Auth error:', error);
           setIsLoading(false);
-        });
-      } else {
-        setSession(null);
-        setUser(null);
+          return;
+        }
+        
+        // For client-side, we still need session for some features
+        // So we get the session after verifying the user
+        if (user) {
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            console.log('[AuthProvider] Session retrieved:', { hasSession: !!session });
+            if (!mounted) return;
+            setSession(session);
+            setUser(user);
+            setIsLoading(false);
+          }).catch((err) => {
+            if (!mounted) return;
+            console.warn('[AuthProvider] Session error:', err);
+            setIsLoading(false);
+          });
+        } else {
+          console.log('[AuthProvider] No user, setting null state');
+          setSession(null);
+          setUser(null);
+          setIsLoading(false);
+        }
+      }).catch((err) => {
+        if (!mounted) return;
+        console.warn('[AuthProvider] Auth getUser error:', err);
         setIsLoading(false);
-      }
-    });
+      });
 
-    // Listen for auth changes
-    // Note: onAuthStateChange provides session which is fine for reactivity
-    // The initial getUser() ensures we start with verified user data
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      // Listen for auth changes
+      // Note: onAuthStateChange provides session which is fine for reactivity
+      // The initial getUser() ensures we start with verified user data
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log('[AuthProvider] Auth state changed:', event, { hasSession: !!session });
+        if (!mounted) return;
+        setSession(session);
+        setUser(session?.user ?? null);
+        setIsLoading(false);
+      });
+
+      return () => {
+        console.log('[AuthProvider] Cleanup running');
+        mounted = false;
+        subscription.unsubscribe();
+      };
+    } catch (error) {
+      console.error('[AuthProvider] Initialization error:', error);
       setIsLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+      return () => {
+        mounted = false;
+      };
+    }
   }, []);
 
   const signOut = async () => {

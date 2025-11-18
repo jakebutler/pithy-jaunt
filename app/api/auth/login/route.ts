@@ -1,52 +1,56 @@
-import { createClient } from "@/lib/auth/supabase-server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/auth/supabase-server'
 
-/**
- * POST /api/auth/login
- * Authenticate user with email and password
- */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const { email, password } = await request.json()
 
     // Validate input
     if (!email || !password) {
       return NextResponse.json(
-        { error: "Email and password are required" },
+        { error: 'Email and password are required' },
         { status: 400 }
-      );
+      )
+    }
+
+    // Check if Supabase is properly configured
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      console.error('Supabase environment variables not configured')
+      return NextResponse.json(
+        { error: 'Server configuration error. Please contact support.' },
+        { status: 500 }
+      )
     }
 
     // Sign in with Supabase
-    const supabase = await createClient();
+    const supabase = createClient()
+    
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
-    });
+    })
 
     if (error) {
+      console.error('Supabase login error:', error)
       // Return generic error for security (don't reveal if email exists)
       return NextResponse.json(
-        { error: "Invalid credentials" },
+        { error: 'Invalid credentials' },
         { status: 401 }
-      );
+      )
     }
 
-    // Return session data
-    return NextResponse.json(
-      {
-        userId: data.user?.id,
-        email: data.user?.email,
-        message: "Login successful",
-      },
-      { status: 200 }
-    );
+    // Cookies are automatically set by the Supabase client
+    return NextResponse.json({
+      userId: data.user?.id,
+      email: data.user?.email,
+      message: 'Login successful',
+    }, { status: 200 })
   } catch (error) {
-    console.error("Login error:", error);
+    console.error('Login error:', error)
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: 'Internal server error' },
       { status: 500 }
-    );
+    )
   }
 }
 

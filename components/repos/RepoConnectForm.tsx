@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 interface RepoConnectFormProps {
   onSuccess?: (repoId: string) => void;
@@ -12,7 +15,7 @@ interface RepoConnectFormProps {
  * Allows users to connect a GitHub repository by URL
  */
 export function RepoConnectForm({ onSuccess }: RepoConnectFormProps) {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("");
   const [error, setError] = useState("");
@@ -61,7 +64,7 @@ export function RepoConnectForm({ onSuccess }: RepoConnectFormProps) {
         onSuccess(data.repoId);
       } else {
         const nextPath = data.next || `/repos/${data.repoId}`
-        navigate({ to: nextPath })
+        router.push(nextPath)
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
@@ -90,63 +93,44 @@ export function RepoConnectForm({ onSuccess }: RepoConnectFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div
-          className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded"
-          role="alert"
-          aria-live="assertive"
-        >
+        <Alert variant="error" dismissible onDismiss={() => setError("")}>
           {error}
-        </div>
+        </Alert>
       )}
 
-      <div>
-        <label htmlFor="repoUrl" className="block text-sm font-medium text-gray-700 mb-1">
-          Repository URL
-        </label>
-        <input
-          id="repoUrl"
-          name="repoUrl"
-          type="text"
-          required
-          value={repoUrl}
-          onChange={(e) => handleUrlChange(e.target.value)}
-          placeholder="https://github.com/owner/repo or owner/repo"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          disabled={isLoading}
-          aria-describedby="repoUrl-help"
-        />
-        <p id="repoUrl-help" className="mt-1 text-sm text-gray-500">
-          Enter a public GitHub repository URL
-        </p>
-      </div>
+      <Input
+        id="repoUrl"
+        label="Repository URL"
+        type="text"
+        required
+        value={repoUrl}
+        onChange={(e) => handleUrlChange(e.target.value)}
+        placeholder="https://github.com/owner/repo or owner/repo"
+        disabled={isLoading}
+        error={error && !error.includes("already connected") ? error : undefined}
+        helpText="Enter a public GitHub repository URL"
+      />
 
-      <div>
-        <label htmlFor="branch" className="block text-sm font-medium text-gray-700 mb-1">
-          Branch (optional)
-        </label>
-        <input
-          id="branch"
-          name="branch"
-          type="text"
-          value={branch}
-          onChange={(e) => setBranch(e.target.value)}
-          placeholder="main"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          disabled={isLoading}
-          aria-describedby="branch-help"
-        />
-        <p id="branch-help" className="mt-1 text-sm text-gray-500">
-          Leave empty to use the repository&apos;s default branch
-        </p>
-      </div>
+      <Input
+        id="branch"
+        label="Branch (optional)"
+        type="text"
+        value={branch}
+        onChange={(e) => setBranch(e.target.value)}
+        placeholder="main"
+        disabled={isLoading}
+        helpText="Leave empty to use the repository's default branch"
+      />
 
-      <button
+      <Button
         type="submit"
+        variant="primary"
         disabled={isLoading || !repoUrl.trim()}
-        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        isLoading={isLoading}
+        className="w-full"
       >
-        {isLoading ? "Connecting..." : "Connect Repository"}
-      </button>
+        Connect Repository
+      </Button>
     </form>
   );
 }

@@ -108,18 +108,18 @@ export function TaskLogs({ taskId }: TaskLogsProps) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg">
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Execution Logs</h3>
+    <div className="bg-white border border-neutral-200 rounded-lg">
+      <div className="px-4 py-3 border-b border-neutral-200 flex items-center justify-between">
+        <h3 className="text-h3 text-neutral-dark">Execution Logs</h3>
         <div className="flex items-center gap-2">
           {isConnected ? (
-            <span className="inline-flex items-center gap-2 text-sm text-green-600">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className="inline-flex items-center gap-2 text-small text-success-dark">
+              <span className="w-2 h-2 bg-success-dark rounded-full animate-pulse" />
               Connected
             </span>
           ) : (
-            <span className="inline-flex items-center gap-2 text-sm text-gray-500">
-              <span className="w-2 h-2 bg-gray-400 rounded-full" />
+            <span className="inline-flex items-center gap-2 text-small text-neutral-500">
+              <span className="w-2 h-2 bg-neutral-400 rounded-full" />
               Disconnected
             </span>
           )}
@@ -127,24 +127,24 @@ export function TaskLogs({ taskId }: TaskLogsProps) {
       </div>
 
       {error && (
-        <div className="px-4 py-2 bg-yellow-50 border-b border-yellow-200 text-yellow-800 text-sm">
+        <div className="px-4 py-2 bg-warning-light border-b border-warning text-warning-dark text-small">
           {error}
         </div>
       )}
 
-      <div className="p-4 bg-gray-900 text-green-400 font-mono text-sm overflow-auto max-h-96">
+      <div className="p-4 bg-neutral-900 text-success-light font-mono text-small overflow-auto max-h-96">
         {logs.length === 0 ? (
-          <div className="text-gray-500">Waiting for logs...</div>
+          <div className="text-neutral-500">Waiting for logs...</div>
         ) : (
           logs.map((log, index) => (
             <div
               key={index}
               className={
                 log.type === "error"
-                  ? "text-red-400"
+                  ? "text-error-light"
                   : log.type === "llm_request"
-                  ? "text-blue-400"
-                  : "text-green-400"
+                  ? "text-info-light"
+                  : "text-success-light"
               }
             >
               {formatLogEvent(log, index)}

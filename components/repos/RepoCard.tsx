@@ -1,7 +1,9 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
+import Link from "next/link";
 import { ExternalLink } from "@/components/ui/ExternalLink";
+import { Card, CardBody } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface RepoCardProps {
   id: string;
@@ -27,34 +29,16 @@ export function RepoCard({
   coderabbitDetected,
 }: RepoCardProps) {
   function getStatusBadge() {
-    const baseClasses = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium";
-    
     switch (status) {
       case "completed":
-        return (
-          <span className={`${baseClasses} bg-green-100 text-green-800`}>
-            Completed
-          </span>
-        );
+        return <Badge variant="success">Completed</Badge>;
       case "analyzing":
-        return (
-          <span className={`${baseClasses} bg-blue-100 text-blue-800`}>
-            Analyzing...
-          </span>
-        );
+        return <Badge variant="info" pulse>Analyzing...</Badge>;
       case "failed":
-        return (
-          <span className={`${baseClasses} bg-red-100 text-red-800`}>
-            Failed
-          </span>
-        );
+        return <Badge variant="error">Failed</Badge>;
       case "pending":
       default:
-        return (
-          <span className={`${baseClasses} bg-gray-100 text-gray-800`}>
-            Pending
-          </span>
-        );
+        return <Badge variant="default">Pending</Badge>;
     }
   }
 
@@ -65,50 +49,50 @@ export function RepoCard({
   }
 
   return (
-    <div className="block p-6 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between">
-        <Link to="/repos/$repoId" params={{ repoId: id }} className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="text-lg font-semibold text-gray-900 truncate">
-              {owner}/{name}
-            </h3>
-            {getStatusBadge()}
-          </div>
-          
-          <div className="flex items-center gap-4 text-xs text-gray-500">
-            <span>
-              Last analyzed: {formatDate(lastAnalyzedAt)}
-            </span>
-            {coderabbitDetected && (
-              <span className="text-green-600">CodeRabbit configured</span>
-            )}
-          </div>
-        </Link>
+    <Card variant="elevated" className="block">
+      <CardBody>
+        <div className="flex items-start justify-between">
+          <Link href={`/repos/${id}`} className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-h4 text-neutral-dark truncate">
+                {owner}/{name}
+              </h3>
+              {getStatusBadge()}
+            </div>
+            
+            <div className="flex items-center gap-4 text-caption text-neutral-500">
+              <span>Last analyzed: {formatDate(lastAnalyzedAt)}</span>
+              {coderabbitDetected && (
+                <Badge variant="success" size="sm">CodeRabbit configured</Badge>
+              )}
+            </div>
+          </Link>
 
-        <div className="flex items-center gap-2">
-          <ExternalLink
-            href={url}
-            className="text-sm text-gray-500 hover:text-blue-600 truncate max-w-xs"
-          >
-            {url}
-          </ExternalLink>
-          <svg
-            className="w-5 h-5 text-gray-400 flex-shrink-0"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
+          <div className="flex items-center gap-2">
+            <ExternalLink
+              href={url}
+              className="text-small text-neutral-500 hover:text-primary truncate max-w-xs transition-colors"
+            >
+              {url}
+            </ExternalLink>
+            <svg
+              className="w-5 h-5 text-neutral-400 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </div>
         </div>
-      </div>
-    </div>
+      </CardBody>
+    </Card>
   );
 }
 

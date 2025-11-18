@@ -1,28 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    e.stopPropagation();
     setError("");
 
-    // Validate passwords match
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
-    // Validate password length
     if (password.length < 8) {
       setError("Password must be at least 8 characters");
       return;
@@ -31,132 +31,105 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/auth/signup", {
+      const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      const data = await response.json();
 
-      if (!res.ok) {
-        setError(data.error || "Signup failed");
+      if (!response.ok) {
+        setError(data.error || "Signup failed. Please try again.");
         return;
       }
 
-      // Redirect to dashboard on success
-      router.push("/dashboard");
-      router.refresh();
-    } catch (err) {
-      setError("An unexpected error occurred");
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 500);
+    } catch {
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-blue-600 hover:text-blue-500"
-            >
-              Sign in
-            </Link>
-          </p>
+    <div className="w-full space-y-8">
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl font-semibold text-neutral-dark">Create your account</h1>
+        <p className="text-sm text-neutral-600">
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-primary hover:text-primary-dark transition-colors">
+            Sign in
+          </Link>
+        </p>
+      </div>
+
+      <form
+        className="space-y-6"
+        onSubmit={handleSubmit}
+        method="POST"
+        action="/api/auth/signup"
+        noValidate
+        encType="application/json"
+      >
+        {error && (
+          <Alert variant="error" dismissible onDismiss={() => setError("")}>
+            {error}
+          </Alert>
+        )}
+
+        <div className="space-y-4">
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            label="Email address"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email address"
+            disabled={isLoading}
+          />
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            label="Password"
+            autoComplete="new-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password (minimum 8 characters)"
+            disabled={isLoading}
+          />
+          <Input
+            id="confirm-password"
+            name="confirm-password"
+            type="password"
+            label="Confirm password"
+            autoComplete="new-password"
+            required
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirm password"
+            disabled={isLoading}
+          />
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div
-              className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded"
-              role="alert"
-              aria-live="assertive"
-            >
-              {error}
-            </div>
-          )}
+        <div className="text-sm text-neutral-600">
+          <p className="font-medium">Password requirements</p>
+          <ul className="list-disc list-inside mt-1">
+            <li>At least 8 characters long</li>
+          </ul>
+        </div>
 
-          <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Password (minimum 8 characters)"
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="confirm-password" className="sr-only">
-                Confirm password
-              </label>
-              <input
-                id="confirm-password"
-                name="confirm-password"
-                type="password"
-                autoComplete="new-password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Confirm password"
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-
-          <div className="text-sm text-gray-600">
-            <p>Password requirements:</p>
-            <ul className="list-disc list-inside mt-1">
-              <li>At least 8 characters long</li>
-            </ul>
-          </div>
-
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? "Creating account..." : "Create account"}
-            </button>
-          </div>
-        </form>
-      </div>
+        <Button type="submit" variant="primary" disabled={isLoading} isLoading={isLoading} className="w-full">
+          Create account
+        </Button>
+      </form>
     </div>
   );
 }

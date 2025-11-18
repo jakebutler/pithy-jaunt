@@ -1,0 +1,5 @@
+legacy-src
+dist
+.next
+node_modules
+

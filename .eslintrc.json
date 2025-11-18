@@ -1,4 +1,7 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "rules": {
+    "react/jsx-props-no-spreading": "off"
+  }
 }
 

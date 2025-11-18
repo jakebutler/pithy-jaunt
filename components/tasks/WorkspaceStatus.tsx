@@ -1,5 +1,7 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
+
 interface WorkspaceStatusProps {
   status: "creating" | "running" | "stopped" | "terminated";
   uptimeMs?: number;
@@ -16,41 +18,27 @@ export function WorkspaceStatus({
   lastUsedAt,
 }: WorkspaceStatusProps) {
   function getStatusBadge() {
-    const baseClasses = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium";
-    
     switch (status) {
       case "running":
         return (
-          <span className={`${baseClasses} bg-green-100 text-green-800`}>
-            <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse" />
+          <Badge variant="success" pulse>
+            <span className="w-1.5 h-1.5 bg-success-dark rounded-full mr-1.5 animate-pulse" />
             Running
-          </span>
+          </Badge>
         );
       case "creating":
         return (
-          <span className={`${baseClasses} bg-blue-100 text-blue-800`}>
-            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1.5 animate-pulse" />
+          <Badge variant="info" pulse>
+            <span className="w-1.5 h-1.5 bg-info-dark rounded-full mr-1.5 animate-pulse" />
             Creating
-          </span>
+          </Badge>
         );
       case "stopped":
-        return (
-          <span className={`${baseClasses} bg-gray-100 text-gray-800`}>
-            Stopped
-          </span>
-        );
+        return <Badge variant="default">Stopped</Badge>;
       case "terminated":
-        return (
-          <span className={`${baseClasses} bg-red-100 text-red-800`}>
-            Terminated
-          </span>
-        );
+        return <Badge variant="error">Terminated</Badge>;
       default:
-        return (
-          <span className={`${baseClasses} bg-gray-100 text-gray-800`}>
-            Unknown
-          </span>
-        );
+        return <Badge variant="default">Unknown</Badge>;
     }
   }
 
@@ -84,13 +72,13 @@ export function WorkspaceStatus({
   }
 
   return (
-    <div className="flex items-center gap-4 text-sm">
+    <div className="flex items-center gap-4 text-small">
       {getStatusBadge()}
       {uptimeMs !== undefined && status === "running" && (
-        <span className="text-gray-600">Uptime: {formatUptime(uptimeMs)}</span>
+        <span className="text-neutral-600">Uptime: {formatUptime(uptimeMs)}</span>
       )}
       {lastUsedAt && (
-        <span className="text-gray-500">Last used: {formatLastUsed(lastUsedAt)}</span>
+        <span className="text-neutral-500">Last used: {formatLastUsed(lastUsedAt)}</span>
       )}
     </div>
   );
