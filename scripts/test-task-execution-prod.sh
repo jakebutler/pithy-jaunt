@@ -204,25 +204,29 @@ function api_request() {
     log_verbose "Request body: $data"
   fi
   
-  local response
+  # Create temp file for response
+  local temp_file=$(mktemp)
+  local http_code
+  
   if [ -n "$data" ]; then
-    response=$(curl -s -w "\n%{http_code}" -X "$method" \
+    http_code=$(curl -s -w "%{http_code}" -o "$temp_file" -X "$method" \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
       -d "$data" \
       "$url")
   else
-    response=$(curl -s -w "\n%{http_code}" -X "$method" \
+    http_code=$(curl -s -w "%{http_code}" -o "$temp_file" -X "$method" \
       -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
       "$url")
   fi
   
-  local http_code=$(echo "$response" | tail -n1)
-  local body=$(echo "$response" | sed '$d')
+  local body=$(cat "$temp_file")
+  rm -f "$temp_file"
   
   log_verbose "Response code: $http_code"
   log_verbose "Response body: $body"
   
+  # Output body and return HTTP code
   echo "$body"
   return $http_code
 }
@@ -236,30 +240,53 @@ function get_repo_id() {
   log "Looking up repository ID for: $REPO_URL"
   
   # Get all repos for the user and find matching URL
-  local response=$(api_request "GET" "/api/repo" 2>/dev/null || echo "")
-  local http_code=${PIPESTATUS[0]}
+  local response
+  response=$(api_request "GET" "/api/repo" 2>&1)
+  local http_code=$?
   
-  if [ $http_code -eq 200 ] && [ -n "$response" ]; then
-    # Normalize URL for comparison (remove trailing slash, .git suffix)
-    local normalized_url=$(echo "$REPO_URL" | sed 's|/$||' | sed 's|\.git$||')
-    
-    # Find matching repo
-    local repo_id=$(echo "$response" | jq -r --arg url "$normalized_url" '
-      .repos[]? | 
-      select((.url | gsub("/$"; "") | gsub("\\.git$"; "")) == $url) | 
-      .id
-    ' 2>/dev/null || echo "")
-    
-    if [ -n "$repo_id" ] && [ "$repo_id" != "null" ]; then
-      echo "$repo_id"
-      return
+  if [ $http_code -ne 200 ]; then
+    log_error "Failed to fetch repositories (HTTP $http_code)"
+    if [ -n "$response" ]; then
+      log_error "Response: $response"
     fi
+    exit 1
+  fi
+  
+  if [ -z "$response" ]; then
+    log_error "Empty response from API"
+    exit 1
+  fi
+  
+  # Check if response is valid JSON
+  if ! echo "$response" | jq empty 2>/dev/null; then
+    log_error "Invalid JSON response from API"
+    log_error "Response: $response"
+    exit 1
+  fi
+  
+  # Normalize URL for comparison (remove trailing slash, .git suffix)
+  local normalized_url=$(echo "$REPO_URL" | sed 's|/$||' | sed 's|\.git$||')
+  
+  # Find matching repo
+  local repo_id=$(echo "$response" | jq -r --arg url "$normalized_url" '
+    .repos[]? | 
+    select((.url | gsub("/$"; "") | gsub("\\.git$"; "")) == $url) | 
+    .id
+  ' 2>/dev/null || echo "")
+  
+  if [ -n "$repo_id" ] && [ "$repo_id" != "null" ] && [ "$repo_id" != "" ]; then
+    log_success "Found repository ID: $repo_id"
+    echo "$repo_id"
+    return
   fi
   
   log_error "Repository not found. Please connect the repository first or provide --repo-id"
   log "Available repositories:"
-  if [ -n "$response" ]; then
-    echo "$response" | jq -r '.repos[]? | "  - \(.url) (ID: \(.id))"' 2>/dev/null || echo "  (Unable to parse response)"
+  if echo "$response" | jq -e '.repos' >/dev/null 2>&1; then
+    echo "$response" | jq -r '.repos[]? | "  - \(.url) (ID: \(.id))"' 2>/dev/null || echo "  (No repositories found)"
+  else
+    log_error "Unexpected response format:"
+    echo "$response" | jq . 2>/dev/null || echo "$response"
   fi
   exit 1
 }
@@ -293,8 +320,9 @@ function create_task() {
       }
     }')
   
-  local response=$(api_request "POST" "/api/task" "$data" 2>&1)
-  local http_code=${PIPESTATUS[0]}
+  local response
+  response=$(api_request "POST" "/api/task" "$data" 2>&1)
+  local http_code=$?
   
   if [ $http_code -ne 201 ]; then
     log_error "Failed to create task (HTTP $http_code)"
@@ -318,8 +346,9 @@ function execute_task() {
   
   log "Executing task: $task_id"
   
-  local response=$(api_request "POST" "/api/task/${task_id}/execute" '{}' 2>&1)
-  local http_code=${PIPESTATUS[0]}
+  local response
+  response=$(api_request "POST" "/api/task/${task_id}/execute" '{}' 2>&1)
+  local http_code=$?
   
   if [ $http_code -ne 202 ]; then
     log_error "Failed to execute task (HTTP $http_code)"
@@ -340,8 +369,9 @@ function execute_task() {
 function get_task_status() {
   local task_id=$1
   
-  local response=$(api_request "GET" "/api/task/${task_id}" 2>&1)
-  local http_code=${PIPESTATUS[0]}
+  local response
+  response=$(api_request "GET" "/api/task/${task_id}" 2>&1)
+  local http_code=$?
   
   if [ $http_code -ne 200 ]; then
     log_error "Failed to get task status (HTTP $http_code)"
