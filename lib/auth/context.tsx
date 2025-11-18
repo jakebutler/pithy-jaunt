@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "./supabase-client";
 import type { User, Session } from "@supabase/supabase-js";
+import { useToast } from "@/lib/toast/context";
 
 interface AuthContextType {
   user: User | null;
@@ -24,6 +26,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const { addToast } = useToast();
 
   useEffect(() => {
     let mounted = true;
@@ -105,8 +109,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        addToast({
+          variant: "error",
+          message: "Failed to sign out. Please try again.",
+        });
+        return;
+      }
+
+      // Show success toast and redirect to homepage
+      addToast({
+        variant: "success",
+        message: "You've been signed out successfully.",
+      });
+      
+      router.push("/");
+    } catch (error) {
+      console.error("Sign out error:", error);
+      addToast({
+        variant: "error",
+        message: "An error occurred while signing out.",
+      });
+    }
   };
 
   return (

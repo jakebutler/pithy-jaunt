@@ -7,10 +7,9 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
  * SECURITY NOTE: Only use this with user session tokens, never with service role keys.
  * Session tokens are validated by Supabase and have user-scoped permissions.
  */
-export function createClientWithToken(authToken: string) {
-  // Create a client that uses the token directly
-  // The token will be validated by Supabase when getUser() is called
-  return createSupabaseClient(
+export async function createClientWithToken(authToken: string) {
+  // Create a client that uses the token directly in headers
+  const client = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -19,7 +18,20 @@ export function createClientWithToken(authToken: string) {
           Authorization: `Bearer ${authToken}`,
         },
       },
+      auth: {
+        persistSession: false, // Don't persist session for server-side
+        autoRefreshToken: false, // Don't auto-refresh for server-side
+      },
     }
   );
+
+  // Validate the token by calling getUser() - this will use the Authorization header
+  const { data: { user }, error } = await client.auth.getUser();
+  
+  if (error || !user) {
+    throw new Error(`Invalid token: ${error?.message || 'User not found'}`);
+  }
+
+  return client;
 }
 

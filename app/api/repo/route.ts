@@ -14,13 +14,18 @@ export async function GET(request: NextRequest) {
       : undefined
 
     // Get authenticated user (using token if provided, otherwise cookies)
-    const supabase = token 
-      ? createClientWithToken(token)
-      : createClient()
+    let supabase
+    let user
     
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    if (token) {
+      supabase = await createClientWithToken(token)
+      const result = await supabase.auth.getUser()
+      user = result.data.user
+    } else {
+      supabase = createClient()
+      const result = await supabase.auth.getUser()
+      user = result.data.user
+    }
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

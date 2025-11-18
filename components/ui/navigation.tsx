@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "@/lib/auth/context";
 
 export interface NavigationProps {
   userEmail?: string;
@@ -11,6 +12,7 @@ export interface NavigationProps {
 export function Navigation({ userEmail }: NavigationProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname() || "/";
+  const { signOut } = useAuth();
 
   const navLinks = [
     { to: "/dashboard", label: "Dashboard" },
@@ -55,14 +57,13 @@ export function Navigation({ userEmail }: NavigationProps) {
             {userEmail && (
               <span className="hidden sm:block text-small text-neutral-600">{userEmail}</span>
             )}
-            <form action="/api/auth/logout" method="POST" className="hidden sm:block">
-              <button
-                type="submit"
-                className="text-small text-neutral-700 hover:text-neutral-dark transition-colors"
-              >
-                Sign out
-              </button>
-            </form>
+            <button
+              type="button"
+              onClick={() => signOut()}
+              className="hidden sm:block text-small text-neutral-700 hover:text-neutral-dark transition-colors"
+            >
+              Sign out
+            </button>
 
             {/* Mobile menu button */}
             <button
@@ -122,14 +123,13 @@ export function Navigation({ userEmail }: NavigationProps) {
                   {userEmail}
                 </div>
               )}
-              <form action="/api/auth/logout" method="POST" className="px-3">
-                <button
-                  type="submit"
-                  className="w-full text-left text-small text-neutral-700 hover:text-neutral-dark"
-                >
-                  Sign out
-                </button>
-              </form>
+              <button
+                type="button"
+                onClick={() => signOut()}
+                className="w-full text-left px-3 py-2 text-small text-neutral-700 hover:text-neutral-dark"
+              >
+                Sign out
+              </button>
             </div>
           </div>
         )}
