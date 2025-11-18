@@ -76,35 +76,12 @@ export async function createWorkspaceViaSDK(
       
       // Create workspace with declarative image
       // Daytona will build the image on-demand and cache it for 24 hours
-      sandbox = await daytona.create(
-        {
-          image: declarativeImage,
-          envVars,
-        },
-        {
-          // Stream build logs if available
-          // Note: This callback may be called before the runner is ready, so we handle errors gracefully
-          onSnapshotCreateLogs: (log: unknown) => {
-            try {
-              // The log might be a string or an object with error information
-              if (typeof log === 'string') {
-                console.log("[Daytona SDK] Build log:", log);
-              } else if (log && typeof log === 'object') {
-                const logObj = log as { message?: string; error?: string; statusCode?: number };
-                // If it's an error about no runner assigned, just log it as a warning
-                if (logObj.message?.includes("no runner assigned") || logObj.error?.includes("no runner assigned")) {
-                  console.log("[Daytona SDK] Build log stream not available yet (runner not ready):", logObj.message || logObj.error);
-                } else {
-                  console.log("[Daytona SDK] Build log:", log);
-                }
-              }
-            } catch {
-              // Silently ignore errors in log callback - they're not critical
-              // The workspace creation will still succeed even if log streaming fails
-            }
-          },
-        }
-      );
+      // Note: We don't pass onSnapshotCreateLogs callback because it can cause hangs
+      // when the runner isn't ready yet. Build logs aren't critical for workspace creation.
+      sandbox = await daytona.create({
+        image: declarativeImage,
+        envVars,
+      });
       
       console.log("[Daytona SDK] Workspace created with declarative image");
     } else {
