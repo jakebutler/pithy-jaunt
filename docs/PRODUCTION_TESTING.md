@@ -19,24 +19,34 @@ This enables faster iteration on fixes without manual testing.
    
    **⚠️ Important**: The cookie value is NOT the same as the Bearer token. You need the JWT `access_token` from the session.
    
-   **Easiest method - Browser Console**:
+   **Easiest method - Local Storage**:
+   1. Open DevTools → Application tab (Chrome) or Storage tab (Firefox)
+   2. In left sidebar: Local Storage → your app domain
+   3. Find key like `sb-<project-id>-auth-token`
+   4. The value is JSON - look for `access_token` field
+   5. Copy that value (it's a JWT like `eyJhbGc...`)
+   
+   **Alternative - Extract from Cookie**:
+   1. Open DevTools → Network tab
+   2. Make a request (e.g., load repos page)
+   3. Find request → Headers → Cookie
+   4. Copy the value of `sb-<project-id>-auth-token` (everything after `=`)
+   5. Run: `./scripts/extract-token-from-cookie.sh "<cookie-value>"`
+   6. It will decode and extract the `access_token` for you
+   
+   **Alternative - Browser Console**:
    ```javascript
-   // In browser console (DevTools → Console)
-   const { data: { session } } = await window.supabase.auth.getSession()
-   console.log('Access Token:', session?.access_token)
+   // Check localStorage directly
+   const storageKey = Object.keys(localStorage).find(k => k.includes('auth-token'))
+   if (storageKey) {
+     const session = JSON.parse(localStorage.getItem(storageKey))
+     console.log('Access Token:', session?.access_token)
+   }
    ```
-   Copy the `access_token` value (it's a JWT like `eyJhbGc...`)
    
-   **Alternative - Local Storage**:
-   - Open DevTools → Application tab → Local Storage
-   - Find key `sb-<project-id>-auth-token`
-   - Value is JSON - extract the `access_token` field
-   
-   **Alternative - Network Tab**:
-   - Look for `Authorization: Bearer <token>` header in requests
-   - If not present, the API is using cookies (use console method above)
-   
-   **Helper script**: Run `./scripts/get-supabase-token.sh` for detailed instructions
+   **Helper scripts**: 
+   - Run `./scripts/get-supabase-token.sh` for detailed instructions
+   - Run `./scripts/extract-token-from-cookie.sh <cookie-value>` to extract from cookie
    
    Once you have the token:
    ```bash
