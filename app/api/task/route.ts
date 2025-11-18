@@ -19,9 +19,9 @@ export async function POST(request: NextRequest) {
     
     try {
       if (token) {
-        supabase = await createClientWithToken(token)
-        const result = await supabase.auth.getUser()
-        user = result.data.user
+        const result = await createClientWithToken(token)
+        supabase = result.client
+        user = result.user
       } else {
         supabase = await createClient()
         const result = await supabase.auth.getUser()
@@ -125,9 +125,9 @@ export async function GET(request: NextRequest) {
     
     try {
       if (token) {
-        supabase = await createClientWithToken(token)
-        const result = await supabase.auth.getUser()
-        user = result.data.user
+        const result = await createClientWithToken(token)
+        supabase = result.client
+        user = result.user
       } else {
         supabase = await createClient()
         const result = await supabase.auth.getUser()
