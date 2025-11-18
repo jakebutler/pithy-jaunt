@@ -773,8 +773,19 @@ def generate_patch_from_modified_files(
     for file_path, modified_content in modified_files.items():
         original_file = repo_path / file_path
         
+        # Verify the file path is correct
         if not original_file.exists():
-            # New file
+            # Try to find the file with case-insensitive search
+            found = False
+            for path in repo_path.rglob("*"):
+                if path.is_file() and path.name.lower() == original_file.name.lower():
+                    original_file = path
+                    found = True
+                    print(f"[pj] Found file with different case: {original_file}", file=sys.stderr)
+                    break
+            
+            if not found:
+                # New file
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.tmp') as f:
                 f.write(modified_content)
                 temp_file = f.name
@@ -833,19 +844,28 @@ def generate_patch_from_modified_files(
                 os.unlink(temp_file)
         else:
             # Modified file
-            # Read original content
-            with open(original_file, 'r', encoding='utf-8', errors='ignore') as f:
-                original_content = f.read()
+            # Read original content - use the same encoding and method as find_relevant_files
+            try:
+                with open(original_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    original_content = f.read()
+            except Exception as e:
+                raise RuntimeError(f"Failed to read original file {file_path}: {e}")
+            
+            # Normalize line endings to ensure consistency
+            # Convert all line endings to \n (Unix style)
+            original_content = original_content.replace('\r\n', '\n').replace('\r', '\n')
+            modified_content = modified_content.replace('\r\n', '\n').replace('\r', '\n')
             
             # Write modified content to temp file
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.tmp') as f:
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.tmp', encoding='utf-8') as f:
                 f.write(modified_content)
                 temp_file = f.name
             
             try:
                 # Use git diff --no-index to create patch
+                # Use --ignore-space-at-eol to handle minor whitespace differences
                 result = subprocess.run(
-                    ['git', 'diff', '--no-index', '--', str(original_file), temp_file],
+                    ['git', 'diff', '--no-index', '--ignore-space-at-eol', '--', str(original_file), temp_file],
                     capture_output=True,
                     text=True,
                     cwd=repo_path,
