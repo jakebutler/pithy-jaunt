@@ -1,4 +1,4 @@
-import React, { Component, type ReactNode, useEffect } from 'react'
+import React, { Component, type ReactNode } from 'react'
 import * as Sentry from '@sentry/react'
 import { useAuth } from '@/lib/auth/context'
 
@@ -66,7 +66,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               Something went wrong
             </h2>
             <p className="text-gray-600 text-center mb-6">
-              We're sorry, but something unexpected happened. The error has been reported and we'll look into it.
+              We&apos;re sorry, but something unexpected happened. The error has been reported and we&apos;ll look into it.
             </p>
             <div className="flex gap-3">
               <button

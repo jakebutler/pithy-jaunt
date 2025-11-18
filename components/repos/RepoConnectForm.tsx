@@ -66,7 +66,7 @@ export function RepoConnectForm({ onSuccess }: RepoConnectFormProps) {
         const nextPath = data.next || `/repos/${data.repoId}`
         router.push(nextPath)
       }
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
@@ -119,7 +119,7 @@ export function RepoConnectForm({ onSuccess }: RepoConnectFormProps) {
         onChange={(e) => setBranch(e.target.value)}
         placeholder="main"
         disabled={isLoading}
-        helpText="Leave empty to use the repository's default branch"
+        helpText="Leave empty to use the repository&apos;s default branch"
       />
 
       <Button

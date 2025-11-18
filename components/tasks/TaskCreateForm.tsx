@@ -63,7 +63,7 @@ export function TaskCreateForm({
       } else {
         router.push(`/tasks/${data.taskId}`);
       }
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);

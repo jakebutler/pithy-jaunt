@@ -92,14 +92,16 @@ export async function triggerGitIngestReport(
 
     const data = await response.json();
     return data as GitIngestResponse;
-  } catch (error: any) {
-    if (error.name === "AbortError" || error.name === "TimeoutError") {
-      throw new Error("GitIngest service request timed out");
-    }
-    if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(
-        `Failed to connect to GitIngest service at ${baseUrl}. Is the service running?`
-      );
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      if (error.name === "AbortError" || error.name === "TimeoutError") {
+        throw new Error("GitIngest service request timed out");
+      }
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        throw new Error(
+          `Failed to connect to GitIngest service at ${baseUrl}. Is the service running?`
+        );
+      }
     }
     throw error;
   }

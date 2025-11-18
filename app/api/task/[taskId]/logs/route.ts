@@ -101,7 +101,7 @@ export async function GET(
         try {
           const initMessage = encoder.encode(`data: ${JSON.stringify({ type: 'info', message: 'Connected to log stream' })}\n\n`)
           controller.enqueue(initMessage)
-        } catch (error) {
+        } catch {
           isClosed = true
           controller.close()
           return
@@ -150,8 +150,8 @@ export async function GET(
 
             lastLogId = log._id
           }
-        } catch (error) {
-          console.error('Error fetching existing logs:', error)
+        } catch {
+          // Error fetching existing logs - continue with empty logs
         }
 
         // Poll for new logs every 2 seconds
@@ -214,8 +214,8 @@ export async function GET(
 
               lastLogId = log._id
             }
-          } catch (error) {
-            console.error('Error polling for new logs:', error)
+          } catch {
+            // Error polling for new logs - continue polling
           }
         }, 2000)
 
@@ -232,7 +232,7 @@ export async function GET(
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ type: 'info', message: 'Connection alive' })}\n\n`)
             )
-          } catch (error) {
+          } catch {
             isClosed = true
             if (heartbeatInterval) clearInterval(heartbeatInterval)
             if (pollInterval) clearInterval(pollInterval)
@@ -263,10 +263,11 @@ export async function GET(
         'X-Accel-Buffering': 'no',
       },
     })
-  } catch (error: any) {
-    console.error('Logs Route Error:', error)
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : { message: String(error) };
+    console.error('Logs Route Error:', err.message)
     return new Response(
-      encoder.encode(`data: ${JSON.stringify({ type: 'error', message: `Failed to stream logs: ${error.message || 'Unknown error'}` })}\n\n`),
+      encoder.encode(`data: ${JSON.stringify({ type: 'error', message: `Failed to stream logs: ${err.message || 'Unknown error'}` })}\n\n`),
       {
         status: 500,
         headers: {

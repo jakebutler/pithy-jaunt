@@ -58,11 +58,12 @@ export async function sendCodeRabbitNotInstalledEmail(params: {
 
     console.log("CodeRabbit not installed email sent successfully:", result.data?.id);
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("Error sending CodeRabbit email:", error);
     return {
       success: false,
-      error: error?.message || "Unknown error sending email",
+      error: errorMessage || "Unknown error sending email",
     };
   }
 }

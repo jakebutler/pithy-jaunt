@@ -47,16 +47,15 @@ export function TaskLogs({ taskId }: TaskLogsProps) {
         const logEvent: LogEvent = JSON.parse(event.data);
         console.log("[TaskLogs] Received log event:", logEvent);
         setLogs((prev) => [...prev, logEvent]);
-      } catch (err) {
-        console.error("[TaskLogs] Failed to parse log event:", err, event.data);
+      } catch {
+        console.error("[TaskLogs] Failed to parse log event:", event.data);
       }
     };
 
-    eventSource.onerror = (err) => {
+    eventSource.onerror = () => {
       console.error("[TaskLogs] EventSource error:", {
         readyState: eventSource.readyState,
         url,
-        error: err,
       });
       
       // EventSource errors are common - only show error if we were connected
@@ -88,7 +87,7 @@ export function TaskLogs({ taskId }: TaskLogsProps) {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
-  function formatLogEvent(event: LogEvent, index: number): string {
+  function formatLogEvent(event: LogEvent): string {
     const timestamp = new Date().toLocaleTimeString();
     
     switch (event.type) {
@@ -147,7 +146,7 @@ export function TaskLogs({ taskId }: TaskLogsProps) {
                   : "text-success-light"
               }
             >
-              {formatLogEvent(log, index)}
+              {formatLogEvent(log)}
             </div>
           ))
         )}

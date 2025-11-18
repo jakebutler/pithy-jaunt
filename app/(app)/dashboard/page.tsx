@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/auth/supabase-server";
 import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -189,15 +190,15 @@ async function getOrCreateConvexUser(supabaseUserId: string, email: string) {
   return convexUser;
 }
 
-async function fetchRepos(userId?: string) {
+async function fetchRepos(userId?: Id<"users">) {
   if (!userId) return [];
-  const result = await convexClient.query(api.repos.getReposByUser, { userId: userId as any });
+  const result = await convexClient.query(api.repos.getReposByUser, { userId });
   return Array.isArray(result) ? (result as Repo[]) : [];
 }
 
-async function fetchTasks(userId?: string) {
+async function fetchTasks(userId?: Id<"users">) {
   if (!userId) return [];
-  const result = await convexClient.query(api.tasks.getTasksByUser, { userId: userId as any });
+  const result = await convexClient.query(api.tasks.getTasksByUser, { userId });
   return Array.isArray(result) ? (result as Task[]) : [];
 }
 

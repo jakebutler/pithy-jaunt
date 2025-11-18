@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 
 export interface PageHeaderProps {
   title: string;
-  description?: string;
+  description?: string | ReactNode;
   actions?: ReactNode;
 }
 

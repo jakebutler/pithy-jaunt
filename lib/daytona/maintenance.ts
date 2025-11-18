@@ -9,7 +9,6 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
   terminateWorkspace,
-  getWorkspaceStatus,
   listWorkspaces,
   isDaytonaConfigured,
 } from "./client";
@@ -132,8 +131,8 @@ export async function cleanupWorkspace(
       reason,
       success: true,
     };
-  } catch (error: any) {
-    const errorMessage = error.message || "Unknown error";
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`[Maintenance] Failed to cleanup workspace ${daytonaId}:`, errorMessage);
 
     // If workspace is already terminated, update status in Convex
@@ -148,7 +147,7 @@ export async function cleanupWorkspace(
           reason: `${reason} (already terminated)`,
           success: true,
         };
-      } catch (updateError) {
+      } catch {
         // Ignore update errors
       }
     }
@@ -205,12 +204,13 @@ export async function reconcileWorkspaceStates(): Promise<{
               workspaceId: workspace.daytonaId,
               action: "marked_terminated",
             });
-          } catch (error: any) {
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
             results.errors++;
             results.details.push({
               workspaceId: workspace.daytonaId,
               action: "mark_terminated_failed",
-              error: error.message,
+              error: errorMessage,
             });
           }
         }
@@ -227,24 +227,26 @@ export async function reconcileWorkspaceStates(): Promise<{
               workspaceId: workspace.daytonaId,
               action: `status_updated_${workspace.status}_to_${daytonaWorkspace.status}`,
             });
-          } catch (error: any) {
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
             results.errors++;
             results.details.push({
               workspaceId: workspace.daytonaId,
               action: "status_update_failed",
-              error: error.message,
+              error: errorMessage,
             });
           }
         }
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("[Maintenance] Reconciliation error:", error);
     results.errors++;
     results.details.push({
       workspaceId: "unknown",
       action: "reconciliation_failed",
-      error: error.message,
+      error: errorMessage,
     });
   }
 
@@ -347,7 +349,7 @@ export async function performCleanup(): Promise<CleanupSummary> {
         }
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Maintenance] Cleanup error:", error);
     summary.errors++;
   }

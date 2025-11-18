@@ -59,8 +59,9 @@ export async function GET(
       generatedAt: repo.gitingestReportGeneratedAt || null,
       error: repo.gitingestReportError || null,
     })
-  } catch (error: any) {
-    console.error('Error fetching GitIngest report:', error)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error fetching GitIngest report:', errorMessage)
     return NextResponse.json(
       { error: 'Failed to fetch report' },
       { status: 500 }
@@ -162,32 +163,37 @@ export async function POST(
         success: true,
         message: 'Report generation started',
       })
-    } catch (error: any) {
-      console.error('Error triggering GitIngest report:', error)
-      console.error('Error stack:', error.stack)
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : { message: String(error), stack: undefined };
+      console.error('Error triggering GitIngest report:', err.message)
+      if (err.stack) {
+        console.error('Error stack:', err.stack)
+      }
       
       // Update status to failed
-      const errorMessage = error.message || 'Failed to trigger report generation'
+      const errorMessage = err.message || 'Failed to trigger report generation'
       await convexClient.mutation(api.repos.updateGitIngestReport, {
         repoId: repo._id,
         status: 'failed',
         error: errorMessage,
       }).catch((updateError) => {
-        console.error('Failed to update GitIngest status in Convex:', updateError)
+        const updateErr = updateError instanceof Error ? updateError : { message: String(updateError) };
+        console.error('Failed to update GitIngest status in Convex:', updateErr.message)
       })
 
       // Return error response with details
       return NextResponse.json(
         { 
           error: errorMessage,
-          details: error.message || 'Unknown error',
-          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+          details: err.message || 'Unknown error',
+          stack: process.env.NODE_ENV === 'development' && err.stack ? err.stack : undefined,
         },
         { status: 500 }
       )
     }
-  } catch (error: any) {
-    console.error('Error triggering GitIngest report:', error)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error triggering GitIngest report:', errorMessage)
     return NextResponse.json(
       { error: 'Failed to trigger report generation' },
       { status: 500 }

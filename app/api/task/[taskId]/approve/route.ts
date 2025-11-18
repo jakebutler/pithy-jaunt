@@ -117,10 +117,11 @@ export async function POST(
         },
         { status: 200 }
       )
-    } catch (error: any) {
-      console.error('PR merge error:', error)
+    } catch (error: unknown) {
+      const err = error as { status?: number; message?: string };
+      console.error('PR merge error:', err.message || String(error))
       
-      if (error.status === 405) {
+      if (err.status === 405) {
         return NextResponse.json(
           { error: 'PR cannot be merged (may have conflicts or checks failing)' },
           { status: 400 }
@@ -132,8 +133,9 @@ export async function POST(
         { status: 500 }
       )
     }
-  } catch (error: any) {
-    console.error('Task approval error:', error)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Task approval error:', errorMessage)
     return NextResponse.json(
       { error: 'Failed to approve task' },
       { status: 500 }

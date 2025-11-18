@@ -46,8 +46,9 @@ export async function POST(request: NextRequest) {
     let validation
     try {
       validation = await validateRepository(repoUrl)
-    } catch (error: any) {
-      if (error.status === 403) {
+    } catch (error: unknown) {
+      const err = error as { status?: number; message?: string };
+      if (err.status === 403) {
         return NextResponse.json(
           {
             error:
@@ -133,33 +134,34 @@ export async function POST(request: NextRequest) {
       },
       { status: 202 }
     )
-  } catch (error: any) {
-    console.error('Repository connection error:', error)
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : { message: String(error) };
+    console.error('Repository connection error:', err.message)
 
-    if (error.message?.includes('Invalid GitHub repository URL')) {
+    if (err.message?.includes('Invalid GitHub repository URL')) {
       return NextResponse.json(
         { error: 'Invalid repository URL format' },
         { status: 400 }
       )
     }
 
-    if (error.message?.includes('Private repositories')) {
+    if (err.message?.includes('Private repositories')) {
       return NextResponse.json(
         { error: 'Private repositories are not supported in MVP' },
         { status: 403 }
       )
     }
 
-    if (error.message?.includes('not found')) {
+    if (err.message?.includes('not found')) {
       return NextResponse.json(
         { error: 'Repository not found' },
         { status: 404 }
       )
     }
 
-    if (error.message?.includes('already connected')) {
+    if (err.message?.includes('already connected')) {
       return NextResponse.json(
-        { error: error.message },
+        { error: err.message },
         { status: 409 }
       )
     }

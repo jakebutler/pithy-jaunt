@@ -73,7 +73,7 @@ export async function POST(
         const body = await request.json()
         shouldTerminate = body.terminateWorkspace || false
       }
-    } catch (error) {
+    } catch {
       // Empty body or invalid JSON is fine, use defaults
     }
 
@@ -94,8 +94,9 @@ export async function POST(
             status: 'terminated',
           })
         }
-      } catch (error: any) {
-        console.error('Failed to terminate workspace:', error)
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('Failed to terminate workspace:', errorMessage)
         // Continue with task cancellation even if workspace termination fails
       }
     }
@@ -113,8 +114,9 @@ export async function POST(
       },
       { status: 200 }
     )
-  } catch (error: any) {
-    console.error('Task cancellation error:', error)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Task cancellation error:', errorMessage)
     return NextResponse.json(
       { error: 'Failed to cancel task' },
       { status: 500 }

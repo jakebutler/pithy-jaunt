@@ -23,7 +23,7 @@ interface CreateWorkspaceParams {
   branch: string;
   taskId: string;
   taskDescription: string;
-  modelProvider: "openai" | "anthropic";
+  modelProvider: "openai" | "anthropic" | "openrouter";
   model: string;
   keepWorkspaceAlive?: boolean;
 }
@@ -115,13 +115,14 @@ export async function createWorkspaceViaGitHubActions(
       workspaceId: `github-actions-${params.taskId}`, // Placeholder, will be updated via webhook
       status: "creating" as const,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : { message: String(error), name: 'UnknownError' }
     console.error("[Daytona GitHub Actions] Error dispatching workflow:", {
-      error: error.message,
-      name: error.name,
+      error: err.message,
+      name: err.name,
     });
 
-    throw new Error(`Failed to dispatch GitHub Actions workflow: ${error.message}`);
+    throw new Error(`Failed to dispatch GitHub Actions workflow: ${err.message}`);
   }
 }
 

@@ -80,8 +80,9 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     )
-  } catch (error: any) {
-    console.error('Task creation error:', error)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Task creation error:', errorMessage)
     return NextResponse.json(
       { error: 'Failed to create task' },
       { status: 500 }
@@ -153,8 +154,9 @@ export async function GET(request: NextRequest) {
     }))
 
     return NextResponse.json({ tasks: formattedTasks }, { status: 200 })
-  } catch (error: any) {
-    console.error('Error fetching tasks:', error)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Error fetching tasks:', errorMessage)
     return NextResponse.json(
       { error: 'Failed to fetch tasks' },
       { status: 500 }

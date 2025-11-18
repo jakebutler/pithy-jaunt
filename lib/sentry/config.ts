@@ -45,12 +45,29 @@ export function isSentryEnabled(): boolean {
   return getSentryConfig().enabled
 }
 
+interface SentryEvent {
+  exception?: {
+    values?: Array<{
+      stacktrace?: {
+        frames?: Array<{
+          filename?: string
+        }>
+      }
+    }>
+  }
+}
+
+interface SentryHint {
+  originalException?: Error
+  syntheticException?: Error
+}
+
 /**
  * Filter function for beforeSend hook
  * Filters out development errors and known non-critical errors
  * Returns the event to send, or null to drop the event
  */
-export function shouldSendToSentry(event: any, hint: any): any | null {
+export function shouldSendToSentry(event: SentryEvent, hint?: SentryHint): SentryEvent | null {
   const config = getSentryConfig()
 
   // Don't send errors in test environment
@@ -83,7 +100,7 @@ export function shouldSendToSentry(event: any, hint: any): any | null {
   // Filter out errors from browser extensions
   if (event.exception?.values?.[0]?.stacktrace?.frames) {
     const frames = event.exception.values[0].stacktrace.frames
-    const hasExtensionFrame = frames.some((frame: any) =>
+    const hasExtensionFrame = frames.some((frame) =>
       frame.filename?.includes('extension://') ||
       frame.filename?.includes('moz-extension://') ||
       frame.filename?.includes('safari-extension://')

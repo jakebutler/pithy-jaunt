@@ -37,7 +37,7 @@ export default function Error({
           Something went wrong
         </h2>
         <p className="text-neutral-600 text-center mb-6">
-          We're sorry, but something unexpected happened. Please try again.
+          We&apos;re sorry, but something unexpected happened. Please try again.
         </p>
         {process.env.NODE_ENV === 'development' && (
           <div className="mb-6 p-4 bg-neutral-100 rounded text-sm text-neutral-700 font-mono overflow-auto">

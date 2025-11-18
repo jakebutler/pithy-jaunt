@@ -45,7 +45,7 @@ export function captureError(error: Error | unknown, context?: ErrorContext): vo
 /**
  * Wrap an async function to automatically capture errors in Sentry
  */
-export function withSentryErrorHandling<T extends (...args: any[]) => Promise<any>>(
+export function withSentryErrorHandling<T extends (...args: unknown[]) => Promise<unknown>>(
   fn: T,
   context?: ErrorContext | ((...args: Parameters<T>) => ErrorContext)
 ): T {
@@ -66,19 +66,27 @@ export function withSentryErrorHandling<T extends (...args: any[]) => Promise<an
  * Note: In newer Sentry SDK versions, transactions are created via startSpan
  * This function is kept for compatibility but may need to be updated based on SDK version
  */
+interface SentrySpan {
+  finish(): void
+  setData(key: string, value: unknown): void
+}
+
 export function startTransaction(
   name: string,
   op: string,
   description?: string
-): any {
+): SentrySpan | undefined {
   // Use startSpan for newer SDK versions, or startTransaction for older versions
   // This is a placeholder - adjust based on your Sentry SDK version
-  if (typeof (Sentry as any).startSpan === 'function') {
-    return (Sentry as any).startSpan({ name, op, description }, () => {})
+  const sentryWithSpan = Sentry as typeof Sentry & { startSpan?: (options: { name: string; op: string; description?: string }, callback: () => void) => SentrySpan }
+  const sentryWithTransaction = Sentry as typeof Sentry & { startTransaction?: (options: { name: string; op: string; description?: string }) => SentrySpan }
+  
+  if (typeof sentryWithSpan.startSpan === 'function') {
+    return sentryWithSpan.startSpan({ name, op, description }, () => {})
   }
   // Fallback for older SDK versions
-  if (typeof (Sentry as any).startTransaction === 'function') {
-    return (Sentry as any).startTransaction({ name, op, description })
+  if (typeof sentryWithTransaction.startTransaction === 'function') {
+    return sentryWithTransaction.startTransaction({ name, op, description })
   }
   return undefined
 }

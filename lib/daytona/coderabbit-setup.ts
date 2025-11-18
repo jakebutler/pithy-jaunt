@@ -29,7 +29,7 @@ export async function setupCodeRabbitInWorkspace(params: {
   branchName?: string;
   error?: string;
 }> {
-  const { workspacePath, branch, coderabbitDetected } = params;
+  const { branch, coderabbitDetected } = params;
 
   // Check if CodeRabbit config is needed
   if (!needsCodeRabbitConfig(coderabbitDetected)) {
@@ -43,18 +43,19 @@ export async function setupCodeRabbitInWorkspace(params: {
     // This will be executed in the Daytona workspace
     // The actual implementation will be in the execution script
     
-    // Generate config content
-    const configContent = generateCodeRabbitConfig();
+    // Generate config content (for reference, actual file creation happens in execution script)
+    generateCodeRabbitConfig();
     
     // Return instructions for the execution script
     return {
       success: true,
       branchName: `pj/add-coderabbit-${Date.now()}`,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: error.message,
+      error: errorMessage,
     };
   }
 }

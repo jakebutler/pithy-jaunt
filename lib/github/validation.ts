@@ -38,29 +38,39 @@ export async function validateRepository(repoUrl: string): Promise<{
       isPublic: !repo.private,
       exists: true,
     };
-  } catch (error: any) {
-    if (error.status === 404) {
+  } catch (error: unknown) {
+    const octokitError = error as { status?: number; message?: string }
+    if (octokitError.status === 404) {
       throw new Error("Repository not found or does not exist");
     }
-    if (error.status === 403) {
+    if (octokitError.status === 403) {
       throw new Error("Access denied. Repository may be private or access is restricted");
     }
-    if (error.message.includes("Private repositories")) {
+    if (octokitError.message?.includes("Private repositories")) {
       throw error;
     }
-    throw new Error(`Failed to validate repository: ${error.message}`);
+    throw new Error(`Failed to validate repository: ${octokitError.message || String(error)}`);
   }
 }
 
 /**
  * Handle GitHub API rate limit errors
  */
-export function handleRateLimit(error: any): {
+interface RateLimitError {
+  status?: number
+  headers?: {
+    "x-ratelimit-remaining"?: string
+    "x-ratelimit-reset"?: string
+  }
+}
+
+export function handleRateLimit(error: unknown): {
   retryAfter?: number;
   shouldRetry: boolean;
 } {
-  if (error.status === 403 && error.headers?.["x-ratelimit-remaining"] === "0") {
-    const resetTime = parseInt(error.headers["x-ratelimit-reset"] || "0");
+  const rateLimitError = error as RateLimitError
+  if (rateLimitError.status === 403 && rateLimitError.headers?.["x-ratelimit-remaining"] === "0") {
+    const resetTime = parseInt(rateLimitError.headers["x-ratelimit-reset"] || "0");
     const retryAfter = Math.max(0, resetTime - Math.floor(Date.now() / 1000));
     
     return {
@@ -105,16 +115,18 @@ export async function hasCodeRabbitConfig(
         ref: targetBranch,
       });
       return true;
-    } catch (error: any) {
-      if (error.status === 404) {
+    } catch (error: unknown) {
+      const octokitError = error as { status?: number; message?: string }
+      if (octokitError.status === 404) {
         return false;
       }
       // If it's a different error, log it but don't fail
-      console.warn(`Error checking for .coderabbit.yaml: ${error.message}`);
+      console.warn(`Error checking for .coderabbit.yaml: ${octokitError.message || String(error)}`);
       return false;
     }
-  } catch (error: any) {
-    console.warn(`Error checking CodeRabbit config: ${error.message}`);
+  } catch (error: unknown) {
+    const octokitError = error as { message?: string }
+    console.warn(`Error checking CodeRabbit config: ${octokitError.message || String(error)}`);
     return false;
   }
 }

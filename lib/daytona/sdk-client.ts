@@ -7,7 +7,7 @@
  * Documentation: https://www.daytona.io/docs/en/typescript-sdk/
  */
 
-import { Daytona, Image } from "@daytonaio/sdk";
+import { Daytona } from "@daytonaio/sdk";
 import { buildPithyJauntImage } from "./declarative-image";
 
 // Use declarative images by default (more scalable and flexible)
@@ -22,7 +22,7 @@ interface CreateWorkspaceParams {
   branch: string;
   taskId: string;
   taskDescription: string;
-  modelProvider: "openai" | "anthropic";
+  modelProvider: "openai" | "anthropic" | "openrouter";
   model: string;
   keepWorkspaceAlive?: boolean;
 }
@@ -45,7 +45,6 @@ export async function createWorkspaceViaSDK(
 
   console.log("[Daytona SDK] Creating workspace:", {
     snapshot: DAYTONA_SNAPSHOT_NAME,
-    image: DAYTONA_IMAGE_NAME,
     repoUrl: params.repoUrl,
     branch: params.branch,
   });
@@ -98,20 +97,21 @@ export async function createWorkspaceViaSDK(
       // First, try to verify the snapshot exists (optional check)
       try {
         const snapshotList = await daytona.snapshot.list();
-        const snapshotExists = snapshotList.items.some((s: any) => s.name === DAYTONA_SNAPSHOT_NAME);
+        const snapshotExists = snapshotList.items.some((s: { name?: string }) => s.name === DAYTONA_SNAPSHOT_NAME);
         console.log("[Daytona SDK] Snapshot check:", {
           snapshotName: DAYTONA_SNAPSHOT_NAME,
           exists: snapshotExists,
-          availableSnapshots: snapshotList.items.map((s: any) => s.name),
+          availableSnapshots: snapshotList.items.map((s: { name?: string }) => s.name),
         });
         
         if (!snapshotExists) {
           console.warn(`[Daytona SDK] ⚠️ Snapshot "${DAYTONA_SNAPSHOT_NAME}" not found!`);
-          console.warn(`[Daytona SDK] Available snapshots:`, snapshotList.items.map((s: any) => s.name));
+          console.warn(`[Daytona SDK] Available snapshots:`, snapshotList.items.map((s: { name?: string }) => s.name));
           console.warn(`[Daytona SDK] Will attempt to create anyway - SDK may use default if snapshot doesn't exist`);
         }
-      } catch (snapshotCheckError: any) {
-        console.warn("[Daytona SDK] Could not verify snapshot existence:", snapshotCheckError.message);
+      } catch (snapshotCheckError: unknown) {
+        const error = snapshotCheckError as { message?: string }
+        console.warn("[Daytona SDK] Could not verify snapshot existence:", error.message || String(snapshotCheckError));
         // Continue anyway - the create call will fail if snapshot doesn't exist
       }
       
@@ -171,13 +171,14 @@ export async function createWorkspaceViaSDK(
 
       // Don't wait for the script to complete - it will send webhooks as it progresses
       // The script will handle its own completion and send a webhook when done
-    } catch (execError: any) {
+    } catch (execError: unknown) {
       // Log the error but don't fail the workspace creation
       // The script might still work, or webhooks will report failures
+      const error = execError instanceof Error ? execError : { message: String(execError), name: 'UnknownError', stack: undefined }
       console.error("[Daytona SDK] Error executing script:", {
-        error: execError.message,
-        name: execError.name,
-        stack: execError.stack,
+        error: error.message,
+        name: error.name,
+        stack: error.stack,
       });
       // Continue - the workspace is created, even if script execution failed
       // Webhooks will report the actual status
@@ -187,14 +188,15 @@ export async function createWorkspaceViaSDK(
       workspaceId: sandbox.id,
       status: "running" as const, // Workspace is running and script is executing
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : { message: String(error), name: 'UnknownError', stack: undefined }
     console.error("[Daytona SDK] Error creating workspace:", {
-      error: error.message,
-      name: error.name,
-      stack: error.stack,
+      error: err.message,
+      name: err.name,
+      stack: err.stack,
     });
 
-    throw new Error(`Failed to create workspace via SDK: ${error.message}`);
+    throw new Error(`Failed to create workspace via SDK: ${err.message}`);
   }
 }
 

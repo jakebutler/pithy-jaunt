@@ -15,6 +15,7 @@
  */
 
 import { Image } from "@daytonaio/sdk";
+import type { Daytona } from "@daytonaio/sdk";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -166,7 +167,7 @@ export function buildPithyJauntImageFromDockerfile(): Image {
  * ```
  */
 export async function createPithyJauntSnapshot(
-  daytona: any,
+  daytona: Daytona,
   snapshotName: string = "pithy-jaunt-dev"
 ): Promise<void> {
   const image = buildPithyJauntImage();

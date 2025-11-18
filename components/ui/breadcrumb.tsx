@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ReactNode } from "react";
+// ReactNode not currently used but may be needed for future props
 
 export interface BreadcrumbItem {
   label: string;

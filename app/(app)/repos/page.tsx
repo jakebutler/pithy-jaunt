@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/auth/supabase-server";
 import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import { RepoConnectForm } from "@/components/repos/RepoConnectForm";
 import { RepoCard } from "@/components/repos/RepoCard";
 import { PageHeader } from "@/components/ui/page-header";
@@ -123,8 +124,8 @@ async function getOrCreateConvexUser(supabaseUserId: string, email: string) {
   return convexUser;
 }
 
-async function fetchRepos(userId: string): Promise<Repo[]> {
-  const result = await convexClient.query(api.repos.getReposByUser, { userId: userId as any });
+async function fetchRepos(userId: Id<"users">): Promise<Repo[]> {
+  const result = await convexClient.query(api.repos.getReposByUser, { userId });
   return Array.isArray(result) ? (result as Repo[]) : [];
 }
 

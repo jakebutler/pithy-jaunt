@@ -12,7 +12,6 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  const startTime = Date.now()
   console.log('[TASK EXECUTE] Starting task execution request')
   
   try {
@@ -88,7 +87,7 @@ export async function POST(
         const body = await request.json()
         keepWorkspaceAlive = body.keepWorkspaceAlive || false
       }
-    } catch (error) {
+    } catch {
       // Empty body or invalid JSON is fine, use defaults
     }
 
@@ -126,7 +125,7 @@ export async function POST(
     // Get GitIngest report if available
     const gitingestReport: GitIngestReport | null = 
       repo.gitingestReportStatus === 'completed' && repo.gitingestReport
-        ? (repo.gitingestReport as any as GitIngestReport)
+        ? (repo.gitingestReport as unknown as GitIngestReport)
         : null
 
     // Enhance task description with GitIngest report data
@@ -184,11 +183,13 @@ export async function POST(
         },
         { status: 202 }
       )
-    } catch (error: any) {
-      console.error('Workspace creation error:', error)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Workspace creation error:', errorMessage)
       
       // Capture error in Sentry with context
-      captureError(error, {
+      const errorToCapture = error instanceof Error ? error : new Error(String(error));
+      captureError(errorToCapture, {
         taskId: task._id,
         repoId: task.repoId,
         userId: convexUser._id,
@@ -201,28 +202,32 @@ export async function POST(
         status: 'failed',
       })
 
+      const err = error instanceof Error ? error : { message: String(error) };
       return NextResponse.json(
         {
           error: 'Failed to create workspace',
-          details: error.message || 'Unknown error',
+          details: err.message || 'Unknown error',
         },
         { status: 500 }
       )
     }
-  } catch (error: any) {
-    console.error('Task execution error:', error)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Task execution error:', errorMessage)
     
     // Capture error in Sentry
     const { taskId } = await params
-    captureError(error, {
+    const errorToCapture = error instanceof Error ? error : new Error(String(error));
+    captureError(errorToCapture, {
       taskId,
       operation: 'task_execution',
     })
     
+    const err = error instanceof Error ? error : { message: String(error) };
     return NextResponse.json(
       { 
         error: 'Failed to execute task',
-        details: error.message || 'Unknown error',
+        details: err.message || 'Unknown error',
       },
       { status: 500 }
     )

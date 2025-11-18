@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/auth/supabase-server";
 import { convexClient } from "@/lib/convex/server";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -116,7 +117,7 @@ async function getOrCreateConvexUser(supabaseUserId: string, email: string) {
   return convexUser;
 }
 
-async function fetchTasks(userId: string): Promise<Task[]> {
+async function fetchTasks(userId: Id<"users">): Promise<Task[]> {
   const result = await convexClient.query(api.tasks.getTasksByUser, { userId });
   return Array.isArray(result) ? (result as Task[]) : [];
 }

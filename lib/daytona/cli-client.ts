@@ -19,7 +19,7 @@ interface CreateWorkspaceParams {
   branch: string;
   taskId: string;
   taskDescription: string;
-  modelProvider: "openai" | "anthropic";
+  modelProvider: "openai" | "anthropic" | "openrouter";
   model: string;
   keepWorkspaceAlive?: boolean;
 }
@@ -80,10 +80,10 @@ export async function createWorkspaceViaCLI(
     }
 
     // Parse JSON output
-    let data: any;
+    let data: { id?: string; workspaceId?: string; sandboxId?: string };
     try {
-      data = JSON.parse(stdout);
-    } catch (parseError) {
+      data = JSON.parse(stdout) as { id?: string; workspaceId?: string; sandboxId?: string };
+    } catch {
       // If JSON parsing fails, try to extract workspace ID from text output
       const idMatch = stdout.match(/workspace[_-]?id[:\s]+([a-f0-9-]+)/i) ||
                      stdout.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
@@ -111,29 +111,30 @@ export async function createWorkspaceViaCLI(
       workspaceId,
       status: "creating" as const,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: string; signal?: string; stdout?: string; stderr?: string }
     console.error("[Daytona CLI] Error creating workspace:", {
-      error: error.message,
-      code: error.code,
-      signal: error.signal,
-      stdout: error.stdout?.substring(0, 500),
-      stderr: error.stderr?.substring(0, 500),
+      error: err.message,
+      code: err.code,
+      signal: err.signal,
+      stdout: err.stdout?.substring(0, 500),
+      stderr: err.stderr?.substring(0, 500),
     });
 
     // Provide helpful error messages
-    if (error.code === "ENOENT") {
+    if (err.code === "ENOENT") {
       throw new Error(
         "Daytona CLI not found. Please install it: https://www.daytona.io/docs/getting-started/installation"
       );
     }
 
-    if (error.message?.includes("not authenticated") || error.message?.includes("authentication")) {
+    if (err.message?.includes("not authenticated") || err.message?.includes("authentication")) {
       throw new Error(
         "Daytona CLI not authenticated. Please run: daytona auth login"
       );
     }
 
-    throw new Error(`Failed to create workspace via CLI: ${error.message}`);
+    throw new Error(`Failed to create workspace via CLI: ${err.message || "Unknown error"}`);
   }
 }
 
@@ -173,8 +174,9 @@ export async function getWorkspaceStatusViaCLI(
       workspaceId: data.id || data.workspaceId || workspaceId,
       status: mappedStatus,
     };
-  } catch (error: any) {
-    if (error.message?.includes("not found") || error.code === 1) {
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: number }
+    if (err.message?.includes("not found") || err.code === 1) {
       return {
         workspaceId,
         status: "terminated",
@@ -195,9 +197,10 @@ export async function terminateWorkspaceViaCLI(workspaceId: string): Promise<voi
       timeout: 30000,
     });
     console.log("[Daytona CLI] Workspace terminated:", workspaceId);
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Ignore errors if workspace already terminated
-    if (!error.message?.includes("not found")) {
+    const err = error as { message?: string }
+    if (err.message && !err.message.includes("not found")) {
       throw error;
     }
   }

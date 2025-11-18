@@ -9,7 +9,6 @@
  */
 
 const CODERABBIT_API_KEY = process.env.CODERABBIT_API_KEY;
-const CODERABBIT_API_URL = process.env.CODERABBIT_API_URL || "https://api.coderabbit.ai";
 
 /**
  * Trigger CodeRabbit analysis for a repository
@@ -20,7 +19,8 @@ const CODERABBIT_API_URL = process.env.CODERABBIT_API_URL || "https://api.codera
  * - Response format
  * - Webhook configuration
  */
-export async function triggerRepositoryAnalysis(params: {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function triggerRepositoryAnalysis(_params: {
   repoUrl: string;
   owner: string;
   repo: string;

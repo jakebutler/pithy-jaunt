@@ -93,8 +93,10 @@ export function parseCodeRabbitComment(comment: string): CodeRabbitReport {
  */
 export function createTasksFromReport(
   report: CodeRabbitReport,
-  repoId: string,
-  userId: string
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _repoId: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _userId: string // Reserved for future use
 ): Array<{
   title: string;
   description: string;

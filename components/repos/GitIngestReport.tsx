@@ -51,7 +51,7 @@ export function GitIngestReport({
 
       // Refresh the page to show updated status
       window.location.reload();
-    } catch (err) {
+    } catch {
       alert("Failed to generate report. Please try again.");
     } finally {
       setIsGenerating(false);

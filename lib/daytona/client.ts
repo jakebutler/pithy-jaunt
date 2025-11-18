@@ -27,7 +27,7 @@ const USE_GITHUB_ACTIONS = process.env.DAYTONA_USE_GITHUB_ACTIONS === "true";
 /**
  * Create a Daytona workspace
  */
-export async function createWorkspace(params: {
+export interface CreateWorkspaceParams {
   repoUrl: string;
   branch: string;
   taskId: string;
@@ -35,7 +35,9 @@ export async function createWorkspace(params: {
   modelProvider: "openai" | "anthropic" | "openrouter";
   model: string;
   keepWorkspaceAlive?: boolean;
-}): Promise<{
+}
+
+export async function createWorkspace(params: CreateWorkspaceParams): Promise<{
   workspaceId: string;
   status: "creating" | "running";
 }> {
@@ -52,15 +54,16 @@ export async function createWorkspace(params: {
       const result = await createWorkspaceViaSDK(params);
       console.log("[Daytona] SDK successfully created workspace:", result.workspaceId);
       return result;
-    } catch (error: any) {
-      console.error("[Daytona] SDK failed:", error.message);
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : { message: String(error), name: 'UnknownError', stack: undefined }
+      console.error("[Daytona] SDK failed:", err.message);
       console.error("[Daytona] Error details:", {
-        name: error.name,
-        stack: error.stack,
+        name: err.name,
+        stack: err.stack,
       });
       // Don't fall through to REST API if SDK fails - throw the error instead
       // This prevents creating duplicate workspaces
-      throw new Error(`SDK failed to create workspace: ${error.message}`);
+      throw new Error(`SDK failed to create workspace: ${err.message}`);
     }
   }
 
@@ -127,29 +130,30 @@ export async function createWorkspace(params: {
       },
       body: JSON.stringify(requestBody),
     });
-  } catch (fetchError: any) {
+  } catch (fetchError: unknown) {
     // Handle network errors, DNS errors, connection refused, etc.
+    const err = fetchError instanceof Error ? fetchError : { message: String(fetchError), name: 'UnknownError' }
     console.error("[Daytona] Fetch error:", {
-      message: fetchError.message,
-      name: fetchError.name,
-      code: fetchError.code,
-      cause: fetchError.cause,
+      message: err.message,
+      name: err.name,
+      code: err instanceof Error && 'code' in err ? String(err.code) : undefined,
+      cause: err instanceof Error ? err.cause : undefined,
       url: `${DAYTONA_API_URL}/workspace`,
       apiUrl: DAYTONA_API_URL,
     });
 
     // Provide helpful error messages based on error type
     let errorMessage = "Failed to connect to Daytona API";
-    if (fetchError.message?.includes("ECONNREFUSED")) {
+    if (err.message?.includes("ECONNREFUSED")) {
       errorMessage = `Connection refused. Check if DAYTONA_API_URL is correct: ${DAYTONA_API_URL}`;
-    } else if (fetchError.message?.includes("ENOTFOUND") || fetchError.message?.includes("getaddrinfo")) {
+    } else if (err.message?.includes("ENOTFOUND") || err.message?.includes("getaddrinfo")) {
       errorMessage = `DNS lookup failed. Check if DAYTONA_API_URL is correct: ${DAYTONA_API_URL}`;
-    } else if (fetchError.message?.includes("timeout")) {
+    } else if (err.message?.includes("timeout")) {
       errorMessage = `Request timeout. The Daytona API may be slow or unreachable: ${DAYTONA_API_URL}`;
-    } else if (fetchError.message?.includes("certificate") || fetchError.message?.includes("SSL")) {
+    } else if (err.message?.includes("certificate") || err.message?.includes("SSL")) {
       errorMessage = `SSL/TLS error. Check if the Daytona API URL uses HTTPS correctly: ${DAYTONA_API_URL}`;
     } else {
-      errorMessage = `Network error: ${fetchError.message || "Unknown error"}. Check DAYTONA_API_URL: ${DAYTONA_API_URL}`;
+      errorMessage = `Network error: ${err.message || "Unknown error"}. Check DAYTONA_API_URL: ${DAYTONA_API_URL}`;
     }
 
     throw new Error(errorMessage);
@@ -251,8 +255,9 @@ export async function createWorkspace(params: {
         } else {
           console.warn("[Daytona] CLI not available, cannot use fallback");
         }
-      } catch (cliError: any) {
-        console.error("[Daytona] CLI fallback failed:", cliError.message);
+      } catch (cliError: unknown) {
+        const errorMessage = cliError instanceof Error ? cliError.message : String(cliError);
+        console.error("[Daytona] CLI fallback failed:", errorMessage);
         // Continue with the REST API result (even though it's wrong)
       }
     }
@@ -388,7 +393,7 @@ export async function listWorkspaces(): Promise<Array<{
   // Handle both array and object responses
   const workspaces = Array.isArray(data) ? data : (data.workspaces || []);
   
-  return workspaces.map((ws: any) => {
+  return workspaces.map((ws: { status?: string; state?: string; id?: string; name?: string; workspaceId?: string; createdAt?: string | number }) => {
     const daytonaStatus = ws.status || ws.state || "unknown";
     let mappedStatus: "creating" | "running" | "stopped" | "terminated" = "running";
     
@@ -403,7 +408,7 @@ export async function listWorkspaces(): Promise<Array<{
     }
     
     return {
-      workspaceId: ws.workspaceId || ws.id || ws.name,
+      workspaceId: ws.workspaceId || ws.id || ws.name || "",
       name: ws.name,
       status: mappedStatus,
       createdAt: ws.createdAt ? new Date(ws.createdAt).getTime() : undefined,

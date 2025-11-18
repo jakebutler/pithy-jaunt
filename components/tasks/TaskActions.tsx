@@ -45,7 +45,7 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
       console.log("[TaskActions] Response statusText:", response.statusText);
       console.log("[TaskActions] Response ok:", response.ok);
       
-      let data: any = { error: "Unknown error" };
+      let data: { error?: string; message?: string; details?: string } = { error: "Unknown error" };
       
       // Try to parse as JSON
       if (responseText.trim()) {
@@ -103,7 +103,7 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
       setTimeout(() => {
         setSuccessMessage(null);
       }, 3000);
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
       setIsExecuting(false);
     }
@@ -126,7 +126,7 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
 
       // Reload to show updated status
       window.location.reload();
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
     }
   }
@@ -148,7 +148,7 @@ export function TaskActions({ taskId, taskStatus, prUrl }: TaskActionsProps) {
 
       // Reload to show updated status
       window.location.reload();
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
     }
   }
