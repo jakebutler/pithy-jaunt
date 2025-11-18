@@ -82,14 +82,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Create task in Convex
+    // Ensure modelPreference is properly formatted
+    const formattedModelPreference = modelPreference
+      ? {
+          provider: modelPreference.provider as 'openai' | 'anthropic' | 'openrouter',
+          model: modelPreference.model,
+        }
+      : undefined;
+
     const taskId = await convexClient.mutation(api.tasks.createTask, {
       userId: convexUser._id,
       repoId: repoId as Id<'repos'>,
       title,
       description,
-      priority: priority || 'normal',
-      initiator: 'user',
-      modelPreference,
+      priority: (priority || 'normal') as 'low' | 'normal' | 'high',
+      initiator: 'user' as const,
+      modelPreference: formattedModelPreference,
     })
 
     // Return success response

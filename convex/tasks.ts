@@ -21,24 +21,30 @@ export const createTask = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
+    try {
+      const now = Date.now();
 
-    return await ctx.db.insert("tasks", {
-      userId: args.userId,
-      repoId: args.repoId,
-      title: args.title,
-      description: args.description,
-      status: "queued",
-      priority: args.priority,
-      initiator: args.initiator,
-      modelPreference:
-        args.modelPreference || {
-          provider: "openrouter",
-          model: "moonshotai/kimi-k2-0905",
-        },
-      createdAt: now,
-      updatedAt: now,
-    });
+      const modelPreference = args.modelPreference || {
+        provider: "openrouter" as const,
+        model: "moonshotai/kimi-k2-0905",
+      };
+
+      return await ctx.db.insert("tasks", {
+        userId: args.userId,
+        repoId: args.repoId,
+        title: args.title,
+        description: args.description,
+        status: "queued" as const,
+        priority: args.priority,
+        initiator: args.initiator,
+        modelPreference,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (error) {
+      console.error("Error in createTask mutation:", error);
+      throw error;
+    }
   },
 });
 
