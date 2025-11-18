@@ -339,14 +339,26 @@ Codebase Analysis:
                 max_tokens=max_tokens,  # Model-specific limit
             )
             
-            patch = response.choices[0].message.content.strip()
+            # Safely extract content and metadata
+            if not response.choices or len(response.choices) == 0:
+                raise RuntimeError("No choices in API response")
+            
+            choice = response.choices[0]
+            if not hasattr(choice, 'message') or not choice.message:
+                raise RuntimeError("No message in API response choice")
+            
+            if not hasattr(choice.message, 'content') or not choice.message.content:
+                raise RuntimeError("No content in API response message")
+            
+            patch = choice.message.content.strip()
             
             # Track token usage
-            usage = response.usage
-            print(f"[pj] Token usage: {usage.total_tokens} (prompt: {usage.prompt_tokens}, completion: {usage.completion_tokens})", file=sys.stderr)
+            usage = getattr(response, 'usage', None)
+            if usage:
+                print(f"[pj] Token usage: {usage.total_tokens} (prompt: {usage.prompt_tokens}, completion: {usage.completion_tokens})", file=sys.stderr)
             
             # Check if response was truncated (finish_reason indicates truncation)
-            finish_reason = response.choices[0].finish_reason
+            finish_reason = getattr(choice, 'finish_reason', None)
             if finish_reason == "length":
                 print(f"[pj] Warning: Response was truncated (finish_reason: {finish_reason}). Patch may be incomplete.", file=sys.stderr)
             
@@ -751,10 +763,24 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
                     temperature=0.0,
                     max_tokens=max_tokens,  # Model-specific limit
                 )
-                content = response.choices[0].message.content.strip()
-                finish_reason = response.choices[0].message.finish_reason
-                usage = response.usage
-                print(f"[pj] Token usage: {usage.total_tokens} (prompt: {usage.prompt_tokens}, completion: {usage.completion_tokens})", file=sys.stderr)
+                # Safely extract content and metadata
+                if not response.choices or len(response.choices) == 0:
+                    raise RuntimeError("No choices in API response")
+                
+                choice = response.choices[0]
+                if not hasattr(choice, 'message') or not choice.message:
+                    raise RuntimeError("No message in API response choice")
+                
+                if not hasattr(choice.message, 'content') or not choice.message.content:
+                    raise RuntimeError("No content in API response message")
+                
+                content = choice.message.content.strip()
+                finish_reason = getattr(choice, 'finish_reason', None)  # finish_reason is on the choice, not the message
+                usage = getattr(response, 'usage', None)
+                
+                if usage:
+                    print(f"[pj] Token usage: {usage.total_tokens} (prompt: {usage.prompt_tokens}, completion: {usage.completion_tokens})", file=sys.stderr)
+                
                 if finish_reason == "length":
                     print(f"[pj] WARNING: LLM response was truncated (finish_reason: length). Content may be incomplete.", file=sys.stderr)
             else:  # anthropic
@@ -767,10 +793,20 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
                         {"role": "user", "content": user_prompt},
                     ],
                 )
+                # Safely extract content from Anthropic response
+                if not hasattr(message, 'content') or not message.content or len(message.content) == 0:
+                    raise RuntimeError("No content in Anthropic API response")
+                
+                if not hasattr(message.content[0], 'text') or not message.content[0].text:
+                    raise RuntimeError("No text in Anthropic API response content")
+                
                 content = message.content[0].text.strip()
-                finish_reason = message.stop_reason
-                usage = message.usage
-                print(f"[pj] Token usage: {usage.input_tokens} input, {usage.output_tokens} output", file=sys.stderr)
+                finish_reason = getattr(message, 'stop_reason', None)
+                usage = getattr(message, 'usage', None)
+                
+                if usage:
+                    print(f"[pj] Token usage: {usage.input_tokens} input, {usage.output_tokens} output", file=sys.stderr)
+                
                 if finish_reason == "max_tokens":
                     print(f"[pj] WARNING: LLM response was truncated (stop_reason: max_tokens). Content may be incomplete.", file=sys.stderr)
             
