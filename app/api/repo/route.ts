@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/auth/supabase-server'
 import { convexClient } from '@/lib/convex/server'
 import { api } from '@/convex/_generated/api'
+import { Doc } from '@/convex/_generated/dataModel'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Get authenticated user
     const supabase = createClient()
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
     const repos = Array.isArray(reposResult) ? reposResult : []
 
     // Format response
-    const formattedRepos = repos.map((repo: any) => ({
+    const formattedRepos = repos.map((repo: Doc<'repos'>) => ({
       id: repo._id,
       url: repo.url,
       owner: repo.owner,
