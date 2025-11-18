@@ -78,10 +78,20 @@ export async function createWorkspaceViaSDK(
       // Daytona will build the image on-demand and cache it for 24 hours
       // Note: We don't pass onSnapshotCreateLogs callback because it can cause hangs
       // when the runner isn't ready yet. Build logs aren't critical for workspace creation.
-      sandbox = await daytona.create({
+      // Add a timeout to prevent hanging - the SDK might wait for workspace to be fully ready
+      const createTimeout = 120000; // 2 minutes timeout for workspace creation
+      const createPromise = daytona.create({
         image: declarativeImage,
         envVars,
       });
+      
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Workspace creation timed out after ${createTimeout}ms`));
+        }, createTimeout);
+      });
+      
+      sandbox = await Promise.race([createPromise, timeoutPromise]);
       
       console.log("[Daytona SDK] Workspace created with declarative image");
     } else {
@@ -109,10 +119,20 @@ export async function createWorkspaceViaSDK(
         // Continue anyway - the create call will fail if snapshot doesn't exist
       }
       
-      sandbox = await daytona.create({
+      // Add a timeout to prevent hanging - the SDK might wait for workspace to be fully ready
+      const createTimeout = 120000; // 2 minutes timeout for workspace creation
+      const createPromise = daytona.create({
         snapshot: DAYTONA_SNAPSHOT_NAME,
         envVars,
       });
+      
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Workspace creation timed out after ${createTimeout}ms`));
+        }, createTimeout);
+      });
+      
+      sandbox = await Promise.race([createPromise, timeoutPromise]);
     }
 
     console.log("[Daytona SDK] Workspace created successfully:", {
