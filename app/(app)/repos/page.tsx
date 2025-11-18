@@ -22,7 +22,7 @@ interface Repo {
 }
 
 export default async function ReposPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

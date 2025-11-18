@@ -31,7 +31,7 @@ interface Task {
 
 export default async function RepoDetailPage({ params }: PageProps) {
   const { repoId } = await params;
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
