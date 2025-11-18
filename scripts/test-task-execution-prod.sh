@@ -212,37 +212,64 @@ function api_request() {
   local endpoint=$2
   local data="${3:-}"
   local url="${PROD_URL}${endpoint}"
+  local code_file="${4:-/tmp/api_http_code_$$}"
   
-  log_verbose "API Request: $method $url"
+  log_verbose "API Request: $method $url" >&2
   if [ -n "$data" ]; then
-    log_verbose "Request body: $data"
+    log_verbose "Request body: $data" >&2
   fi
   
-  # Create temp file for response
-  local temp_file=$(mktemp)
   local http_code
+  local curl_output
   
   if [ -n "$data" ]; then
-    http_code=$(curl -s --max-time 30 -w "%{http_code}" -o "$temp_file" -X "$method" \
+    # Use -w to append HTTP code on new line, then split body and code
+    curl_output=$(curl -s --max-time 30 -w "\n%{http_code}" -X "$method" \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
       -d "$data" \
-      "$url")
+      "$url" 2>/dev/null)
   else
-    http_code=$(curl -s --max-time 30 -w "%{http_code}" -o "$temp_file" -X "$method" \
+    curl_output=$(curl -s --max-time 30 -w "\n%{http_code}" -X "$method" \
       -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-      "$url")
+      "$url" 2>/dev/null)
   fi
   
-  local body=$(cat "$temp_file")
-  rm -f "$temp_file"
+  local curl_exit=$?
   
-  log_verbose "Response code: $http_code"
-  log_verbose "Response body: $body"
+  # Split output: last line is HTTP code, everything else is body
+  http_code=$(echo "$curl_output" | tail -n1 | tr -d '\r\n')
+  local body=$(echo "$curl_output" | sed '$d' | tr -d '\0')
   
-  # Output body and return HTTP code
+  # Save HTTP code to file for caller
+  echo "$http_code" > "$code_file"
+  
+  # If curl failed, return error
+  if [ $curl_exit -ne 0 ]; then
+    log_verbose "Curl failed with exit code: $curl_exit" >&2
+    echo "{\"error\":\"Request failed\"}"
+    echo "500" > "$code_file"
+    return 1
+  fi
+  
+  # Validate HTTP code is numeric
+  if ! echo "$http_code" | grep -qE '^[0-9]{3}$'; then
+    log_verbose "Invalid HTTP code received: $http_code" >&2
+    http_code="500"
+    echo "$http_code" > "$code_file"
+  fi
+  
+  log_verbose "Response code: $http_code" >&2
+  log_verbose "Response body: $body" >&2
+  
+  # Output body only
   echo "$body"
-  return $http_code
+  # Return 0 for success, 1 for error (bash return codes are 0-255)
+  if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+    return 0
+  else
+    return 1
+  fi
 }
 
 function get_repo_id() {
@@ -251,30 +278,33 @@ function get_repo_id() {
     return
   fi
   
-  log "Looking up repository ID for: $REPO_URL"
+  log "Looking up repository ID for: $REPO_URL" >&2
   
   # Get all repos for the user and find matching URL
+  local code_file="/tmp/repo_http_code_$$"
   local response
-  response=$(api_request "GET" "/api/repo" 2>&1)
-  local http_code=$?
+  response=$(api_request "GET" "/api/repo" "" "$code_file")
+  local api_exit=$?
+  local http_code=$(cat "$code_file" 2>/dev/null || echo "500")
+  rm -f "$code_file"
   
-  if [ $http_code -ne 200 ]; then
-    log_error "Failed to fetch repositories (HTTP $http_code)"
+  if [ $api_exit -ne 0 ] || [ "$http_code" != "200" ]; then
+    log_error "Failed to fetch repositories (HTTP $http_code)" >&2
     if [ -n "$response" ]; then
-      log_error "Response: $response"
+      log_error "Response: $response" >&2
     fi
     exit 1
   fi
   
   if [ -z "$response" ]; then
-    log_error "Empty response from API"
+    log_error "Empty response from API" >&2
     exit 1
   fi
   
   # Check if response is valid JSON
   if ! echo "$response" | jq empty 2>/dev/null; then
-    log_error "Invalid JSON response from API"
-    log_error "Response: $response"
+    log_error "Invalid JSON response from API" >&2
+    log_error "Response: $response" >&2
     exit 1
   fi
   
@@ -289,18 +319,18 @@ function get_repo_id() {
   ' 2>/dev/null || echo "")
   
   if [ -n "$repo_id" ] && [ "$repo_id" != "null" ] && [ "$repo_id" != "" ]; then
-    log_success "Found repository ID: $repo_id"
+    log_success "Found repository ID: $repo_id" >&2
     echo "$repo_id"
     return
   fi
   
-  log_error "Repository not found. Please connect the repository first or provide --repo-id"
-  log "Available repositories:"
+  log_error "Repository not found. Please connect the repository first or provide --repo-id" >&2
+  log "Available repositories:" >&2
   if echo "$response" | jq -e '.repos' >/dev/null 2>&1; then
-    echo "$response" | jq -r '.repos[]? | "  - \(.url) (ID: \(.id))"' 2>/dev/null || echo "  (No repositories found)"
+    echo "$response" | jq -r '.repos[]? | "  - \(.url) (ID: \(.id))"' 2>/dev/null || echo "  (No repositories found)" >&2
   else
-    log_error "Unexpected response format:"
-    echo "$response" | jq . 2>/dev/null || echo "$response"
+    log_error "Unexpected response format:" >&2
+    echo "$response" | jq . 2>/dev/null || echo "$response" >&2
   fi
   exit 1
 }
@@ -334,24 +364,27 @@ function create_task() {
       }
     }')
   
+  local code_file="/tmp/task_http_code_$$"
   local response
-  response=$(api_request "POST" "/api/task" "$data" 2>&1)
-  local http_code=$?
+  response=$(api_request "POST" "/api/task" "$data" "$code_file")
+  local api_exit=$?
+  local http_code=$(cat "$code_file" 2>/dev/null || echo "500")
+  rm -f "$code_file"
   
-  if [ $http_code -ne 201 ]; then
-    log_error "Failed to create task (HTTP $http_code)"
-    echo "$response" | jq -r '.error // .message // .' 2>/dev/null || echo "$response"
+  if [ $api_exit -ne 0 ] || [ "$http_code" != "201" ]; then
+    log_error "Failed to create task (HTTP $http_code)" >&2
+    echo "$response" | jq -r '.error // .message // .details // .' 2>/dev/null || echo "$response" >&2
     exit 1
   fi
   
   local task_id=$(echo "$response" | jq -r '.taskId' 2>/dev/null || echo "")
   if [ -z "$task_id" ] || [ "$task_id" = "null" ]; then
-    log_error "Invalid response from task creation"
-    echo "$response"
+    log_error "Invalid response from task creation" >&2
+    echo "$response" >&2
     exit 1
   fi
   
-  log_success "Task created: $task_id"
+  log_success "Task created: $task_id" >&2
   echo "$task_id"
 }
 
@@ -360,9 +393,12 @@ function execute_task() {
   
   log "Executing task: $task_id"
   
+  local code_file="/tmp/execute_http_code_$$"
   local response
-  response=$(api_request "POST" "/api/task/${task_id}/execute" '{}' 2>&1)
-  local http_code=$?
+  response=$(api_request "POST" "/api/task/${task_id}/execute" '{}' "$code_file")
+  local api_exit=$?
+  local http_code=$(cat "$code_file" 2>/dev/null || echo "500")
+  rm -f "$code_file"
   
   if [ $http_code -ne 202 ]; then
     log_error "Failed to execute task (HTTP $http_code)"
@@ -383,11 +419,14 @@ function execute_task() {
 function get_task_status() {
   local task_id=$1
   
+  local code_file="/tmp/task_get_http_code_$$"
   local response
-  response=$(api_request "GET" "/api/task/${task_id}" 2>&1)
-  local http_code=$?
+  response=$(api_request "GET" "/api/task/${task_id}" "" "$code_file")
+  local api_exit=$?
+  local http_code=$(cat "$code_file" 2>/dev/null || echo "500")
+  rm -f "$code_file"
   
-  if [ $http_code -ne 200 ]; then
+  if [ $api_exit -ne 0 ] || [ "$http_code" != "200" ]; then
     log_error "Failed to get task status (HTTP $http_code)"
     return 1
   fi
