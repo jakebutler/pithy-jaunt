@@ -10,9 +10,10 @@
 import { Daytona } from "@daytonaio/sdk";
 import { buildPithyJauntImage } from "./declarative-image";
 
-// Use declarative images by default (more scalable and flexible)
-// Set DAYTONA_USE_DECLARATIVE_IMAGE=false to use pre-built snapshots
-const USE_DECLARATIVE_IMAGE = process.env.DAYTONA_USE_DECLARATIVE_IMAGE !== "false";
+// Use pre-built snapshots by default (faster, more reliable)
+// Set DAYTONA_USE_DECLARATIVE_IMAGE=true to use declarative images (builds on-demand)
+// Note: Declarative images can cause hangs during workspace creation
+const USE_DECLARATIVE_IMAGE = process.env.DAYTONA_USE_DECLARATIVE_IMAGE === "true";
 
 // Fallback to snapshot name if not using declarative images
 const DAYTONA_SNAPSHOT_NAME = process.env.DAYTONA_SNAPSHOT_NAME || "butlerjake/pithy-jaunt-daytona:v1.0.4";
