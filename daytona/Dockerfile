@@ -57,9 +57,10 @@ RUN pip3 install --no-cache-dir -r /app/requirements.txt
 RUN pip3 install playwright && \
     playwright install chromium --with-deps
 
-# Copy agent runner and system prompt
+# Copy agent runner and system prompts
 COPY daytona/agent-runner.py /app/agent-runner.py
 COPY daytona/system-prompt.md /app/system-prompt.md
+COPY daytona/system-prompt-file-generation.md /app/system-prompt-file-generation.md
 RUN chmod +x /app/agent-runner.py
 
 # Copy execution script

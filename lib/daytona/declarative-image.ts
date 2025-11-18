@@ -106,12 +106,20 @@ export function buildPithyJauntImage(): Image {
     image = image.runCommands("chmod +x /app/agent-runner.py");
   }
 
-  // Add system prompt
+  // Add system prompts
   const systemPromptPath = path.join(daytonaDir, "system-prompt.md");
   if (fs.existsSync(systemPromptPath)) {
     image = image.addLocalFile(
       systemPromptPath,
       "/app/system-prompt.md"
+    );
+  }
+  
+  const systemPromptFileGenPath = path.join(daytonaDir, "system-prompt-file-generation.md");
+  if (fs.existsSync(systemPromptFileGenPath)) {
+    image = image.addLocalFile(
+      systemPromptFileGenPath,
+      "/app/system-prompt-file-generation.md"
     );
   }
 

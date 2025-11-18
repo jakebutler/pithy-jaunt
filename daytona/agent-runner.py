@@ -880,8 +880,24 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
             # Validate we got at least one file
             if not modified_files:
                 print(f"[pj] ERROR: No valid file content extracted from LLM response", file=sys.stderr)
-                print(f"[pj] Response preview (first 500 chars): {content[:500]}", file=sys.stderr)
-                raise RuntimeError("Failed to extract file content from LLM response. Response may be truncated or malformed.")
+                print(f"[pj] Response preview (first 1000 chars): {content[:1000]}", file=sys.stderr)
+                print(f"[pj] Response length: {len(content)} characters", file=sys.stderr)
+                
+                # Check if response looks like documentation/instructions instead of file content
+                if any(indicator in content[:200].lower() for indicator in [
+                    '##', '###', '**', '* ', '- ', '1.', '2.', 
+                    'use ', 'to create', 'to edit', 'instructions',
+                    'guide', 'tutorial', 'documentation'
+                ]) and 'FILE:' not in content:
+                    error_msg = (
+                        "LLM returned documentation/instructions instead of file content format. "
+                        "Expected format: 'FILE: <path>\\n<content>\\n---'. "
+                        "The LLM may have misunderstood the task or the system prompt was not used correctly."
+                    )
+                    print(f"[pj] {error_msg}", file=sys.stderr)
+                    raise RuntimeError(error_msg)
+                
+                raise RuntimeError("Failed to extract file content from LLM response. Response may be truncated or malformed. Expected format: 'FILE: <path>\\n<content>\\n---'")
             
             # Validate file contents don't contain obvious corruption
             for file_path, file_content in modified_files.items():

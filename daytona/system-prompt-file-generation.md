@@ -94,5 +94,49 @@ To set up the project locally:
 
 ## Response Format
 
-Output ONLY the file content(s) in the format specified above, with no additional explanations or commentary.
+**CRITICAL - You MUST output file content in this EXACT format. DO NOT output anything else:**
+
+```
+FILE: <file_path>
+<complete file content here>
+---
+```
+
+**ABSOLUTELY FORBIDDEN - DO NOT OUTPUT:**
+- ❌ Markdown documentation or instructions (e.g., "## ✍️ Blog Authoring")
+- ❌ Explanations or commentary
+- ❌ Markdown code blocks around the content
+- ❌ Any text before "FILE: " or after "---"
+- ❌ Task descriptions or instructions
+- ❌ Any content that is not the actual file content
+
+**REQUIRED FORMAT:**
+- ✅ Start immediately with `FILE: ` (no preamble, no explanation)
+- ✅ Follow with the complete file path
+- ✅ Output the complete file content (all lines from start to finish)
+- ✅ End with `---` on its own line
+- ✅ Output ONLY the file content - nothing else
+
+**Example of CORRECT output:**
+```
+FILE: README.md
+# Project Name
+
+## Description
+This is the project description.
+
+## Installation
+npm install
+
+---
+```
+
+**Example of INCORRECT output (will cause failure):**
+```
+## ✍️ Blog Authoring (TinaCMS + MDX)
+
+Use TinaCMS to create and edit blog posts...
+```
+
+**If you output anything other than the FILE: format, the system will fail and the task will be marked as failed.**
 
