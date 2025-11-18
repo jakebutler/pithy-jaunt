@@ -439,14 +439,22 @@ Codebase Analysis:
                 ],
             )
             
+            # Safely extract content from Anthropic response
+            if not hasattr(message, 'content') or not message.content or len(message.content) == 0:
+                raise RuntimeError("No content in Anthropic API response")
+            
+            if not hasattr(message.content[0], 'text') or not message.content[0].text:
+                raise RuntimeError("No text in Anthropic API response content")
+            
             patch = message.content[0].text.strip()
             
             # Track token usage
-            usage = message.usage
-            print(f"[pj] Token usage: {usage.input_tokens} input, {usage.output_tokens} output", file=sys.stderr)
+            usage = getattr(message, 'usage', None)
+            if usage:
+                print(f"[pj] Token usage: {usage.input_tokens} input, {usage.output_tokens} output", file=sys.stderr)
             
             # Check if response was truncated (stop_reason indicates truncation)
-            stop_reason = message.stop_reason
+            stop_reason = getattr(message, 'stop_reason', None)
             if stop_reason == "max_tokens":
                 print(f"[pj] Warning: Response was truncated (stop_reason: {stop_reason}). Patch may be incomplete.", file=sys.stderr)
             
