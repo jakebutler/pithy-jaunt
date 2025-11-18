@@ -786,11 +786,11 @@ def generate_patch_from_modified_files(
             
             if not found:
                 # New file
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.tmp') as f:
-                f.write(modified_content)
-                temp_file = f.name
-            
-            try:
+                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.tmp') as f:
+                    f.write(modified_content)
+                    temp_file = f.name
+                
+                try:
                 # Use git diff --no-index to create patch for new file
                 result = subprocess.run(
                     ['git', 'diff', '--no-index', '--', '/dev/null', temp_file],
@@ -839,9 +839,9 @@ def generate_patch_from_modified_files(
                     patch_content,
                     count=1  # Only replace first occurrence per patch
                 )
-                patches.append(patch_content)
-            finally:
-                os.unlink(temp_file)
+                    patches.append(patch_content)
+                finally:
+                    os.unlink(temp_file)
         else:
             # Modified file
             # Read original content - use the same encoding and method as find_relevant_files
