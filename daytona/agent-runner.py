@@ -34,6 +34,60 @@ class TimeoutError(Exception):
     pass
 
 
+def get_max_tokens_for_model(provider: str, model: str) -> int:
+    """
+    Get the maximum completion tokens supported by a model.
+    Returns appropriate max_tokens value based on model capabilities.
+    """
+    model_lower = model.lower()
+    
+    # OpenAI models
+    if provider == "openai" or provider == "openrouter":
+        # GPT-4o supports 16384 completion tokens
+        if "gpt-4o" in model_lower:
+            return 16384
+        # GPT-4-turbo supports 4096 completion tokens
+        elif "gpt-4-turbo" in model_lower or "gpt-4-1106" in model_lower:
+            return 4096
+        # GPT-4 base supports 4096
+        elif "gpt-4" in model_lower and "turbo" not in model_lower and "o" not in model_lower:
+            return 4096
+        # GPT-3.5 supports 4096
+        elif "gpt-3.5" in model_lower:
+            return 4096
+        # Kimi K2 has 200K context window, use 100K for completion (safe limit)
+        elif "kimi-k2" in model_lower or "moonshotai/kimi" in model_lower:
+            return 100000
+        # Other OpenRouter models - use conservative default
+        elif provider == "openrouter":
+            # Default to 32K for OpenRouter models (many support large contexts)
+            return 32000
+        # Default for OpenAI models
+        else:
+            return 16384
+    
+    # Anthropic models
+    elif provider == "anthropic":
+        # Claude 3.5 Sonnet supports 8192 completion tokens
+        if "claude-3-5" in model_lower:
+            return 8192
+        # Claude 3 Opus supports 4096
+        elif "claude-3-opus" in model_lower:
+            return 4096
+        # Claude 3 Sonnet supports 4096
+        elif "claude-3-sonnet" in model_lower:
+            return 4096
+        # Claude 3 Haiku supports 4096
+        elif "claude-3-haiku" in model_lower:
+            return 4096
+        # Default for Anthropic
+        else:
+            return 8192
+    
+    # Unknown provider/model - use conservative default
+    return 16384
+
+
 @contextmanager
 def timeout(seconds: int):
     """Context manager for timing out operations"""
@@ -272,6 +326,9 @@ Codebase Analysis:
     
     try:
         with timeout(180):  # 3 minute timeout
+            max_tokens = get_max_tokens_for_model(provider, model)
+            print(f"[pj] Using max_tokens={max_tokens} for model {model} (provider: {provider})", file=sys.stderr)
+            
             response = client.chat.completions.create(
                 model=model,
                 messages=[
@@ -279,7 +336,7 @@ Codebase Analysis:
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.0,  # Deterministic output
-                max_tokens=16000,  # Increased limit for larger patches
+                max_tokens=max_tokens,  # Model-specific limit
             )
             
             patch = response.choices[0].message.content.strip()
@@ -680,6 +737,9 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
     try:
         with timeout(180):  # 3 minute timeout
             finish_reason = None
+            max_tokens = get_max_tokens_for_model(provider, model)
+            print(f"[pj] Using max_tokens={max_tokens} for model {model} (provider: {provider})", file=sys.stderr)
+            
             if provider == "openai" or provider == "openrouter":
                 # Both OpenAI and OpenRouter use OpenAI-compatible API
                 response = client.chat.completions.create(
@@ -689,7 +749,7 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
                         {"role": "user", "content": user_prompt},
                     ],
                     temperature=0.0,
-                    max_tokens=32000,  # Increased to prevent truncation of large file content
+                    max_tokens=max_tokens,  # Model-specific limit
                 )
                 content = response.choices[0].message.content.strip()
                 finish_reason = response.choices[0].message.finish_reason
@@ -700,7 +760,7 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
             else:  # anthropic
                 message = client.messages.create(
                     model=model,
-                    max_tokens=32768,  # Increased to prevent truncation of large file content
+                    max_tokens=max_tokens,  # Model-specific limit
                     temperature=0.0,
                     system=system_prompt,
                     messages=[
