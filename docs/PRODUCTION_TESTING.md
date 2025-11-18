@@ -16,14 +16,32 @@ This enables faster iteration on fixes without manual testing.
 ## Prerequisites
 
 1. **Supabase Access Token**: You need a valid Supabase access token for authentication
-   - **Easiest method**: Log into the production app in your browser, open DevTools (F12), go to Network tab
-   - Make any API request (e.g., load the repos page)
-   - Look for a request to `/api/repo` or similar
-   - In the Request Headers, find the `Authorization` header
-   - Copy the token value (it will be something like `Bearer eyJhbGc...`)
-   - Extract just the token part (remove "Bearer " prefix)
-   - Set as environment variable: `export SUPABASE_ACCESS_TOKEN="your-token"`
-   - **Alternative**: Get from Supabase dashboard → Authentication → Sessions
+   
+   **⚠️ Important**: The cookie value is NOT the same as the Bearer token. You need the JWT `access_token` from the session.
+   
+   **Easiest method - Browser Console**:
+   ```javascript
+   // In browser console (DevTools → Console)
+   const { data: { session } } = await window.supabase.auth.getSession()
+   console.log('Access Token:', session?.access_token)
+   ```
+   Copy the `access_token` value (it's a JWT like `eyJhbGc...`)
+   
+   **Alternative - Local Storage**:
+   - Open DevTools → Application tab → Local Storage
+   - Find key `sb-<project-id>-auth-token`
+   - Value is JSON - extract the `access_token` field
+   
+   **Alternative - Network Tab**:
+   - Look for `Authorization: Bearer <token>` header in requests
+   - If not present, the API is using cookies (use console method above)
+   
+   **Helper script**: Run `./scripts/get-supabase-token.sh` for detailed instructions
+   
+   Once you have the token:
+   ```bash
+   export SUPABASE_ACCESS_TOKEN="eyJhbGc..."  # Your actual token
+   ```
 
 2. **Repository**: The repository must be connected in the production app
    - Connect it via the UI first, or
