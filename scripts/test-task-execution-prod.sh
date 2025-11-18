@@ -235,11 +235,21 @@ function get_repo_id() {
   
   log "Looking up repository ID for: $REPO_URL"
   
-  # Try to get repo by URL
-  local response=$(api_request "GET" "/api/repo?url=$(echo "$REPO_URL" | jq -sRr @uri)" 2>/dev/null || echo "")
+  # Get all repos for the user and find matching URL
+  local response=$(api_request "GET" "/api/repo" 2>/dev/null || echo "")
+  local http_code=${PIPESTATUS[0]}
   
-  if [ -n "$response" ]; then
-    local repo_id=$(echo "$response" | jq -r '.repoId // empty' 2>/dev/null || echo "")
+  if [ $http_code -eq 200 ] && [ -n "$response" ]; then
+    # Normalize URL for comparison (remove trailing slash, .git suffix)
+    local normalized_url=$(echo "$REPO_URL" | sed 's|/$||' | sed 's|\.git$||')
+    
+    # Find matching repo
+    local repo_id=$(echo "$response" | jq -r --arg url "$normalized_url" '
+      .repos[]? | 
+      select((.url | gsub("/$"; "") | gsub("\\.git$"; "")) == $url) | 
+      .id
+    ' 2>/dev/null || echo "")
+    
     if [ -n "$repo_id" ] && [ "$repo_id" != "null" ]; then
       echo "$repo_id"
       return
@@ -247,6 +257,10 @@ function get_repo_id() {
   fi
   
   log_error "Repository not found. Please connect the repository first or provide --repo-id"
+  log "Available repositories:"
+  if [ -n "$response" ]; then
+    echo "$response" | jq -r '.repos[]? | "  - \(.url) (ID: \(.id))"' 2>/dev/null || echo "  (Unable to parse response)"
+  fi
   exit 1
 }
 
