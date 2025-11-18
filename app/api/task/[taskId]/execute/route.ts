@@ -31,10 +31,15 @@ export async function POST(
     let authError
     
     if (token) {
-      supabase = await createClientWithToken(token)
-      const result = await supabase.auth.getUser()
-      user = result.data.user
-      authError = result.error
+      try {
+        const result = await createClientWithToken(token)
+        supabase = result.client
+        user = result.user
+        authError = null
+      } catch (error) {
+        authError = error instanceof Error ? error : new Error(String(error))
+        user = null
+      }
     } else {
       supabase = await createClient()
       const result = await supabase.auth.getUser()

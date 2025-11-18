@@ -26,12 +26,13 @@ export async function createClientWithToken(authToken: string) {
   );
 
   // Validate the token by calling getUser() - this will use the Authorization header
+  // Note: We validate here but the caller should also call getUser() to get the user
   const { data: { user }, error } = await client.auth.getUser();
   
   if (error || !user) {
     throw new Error(`Invalid token: ${error?.message || 'User not found'}`);
   }
 
-  return client;
+  return { client, user };
 }
 
