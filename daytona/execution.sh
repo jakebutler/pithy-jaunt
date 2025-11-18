@@ -140,8 +140,12 @@ trap '{
 echo "[pj] ========================================"
 echo "[pj] Starting execution for task: $TASK_ID"
 echo "[pj] ========================================"
+echo "[pj] Execution script version: 2025-11-18-v2 (includes BASE_BRANCH fix and improved cloning)"
+echo "[pj] Script location: $(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+echo "[pj] Script checksum: $(md5sum "${BASH_SOURCE[0]}" 2>/dev/null | cut -d' ' -f1 || echo "unknown")"
 echo "[pj] Target repo: $TARGET_REPO"
 echo "[pj] Branch name: ${BRANCH_NAME:-pj/${TASK_ID}}"
+echo "[pj] Base branch: ${BASE_BRANCH:-main (default)}"
 echo "[pj] Model provider: ${MODEL_PROVIDER:-openai}"
 echo "[pj] Model: ${MODEL:-gpt-4o}"
 
