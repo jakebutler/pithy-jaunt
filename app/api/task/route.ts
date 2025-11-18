@@ -106,11 +106,12 @@ export async function POST(request: NextRequest) {
     const errorStack = error instanceof Error ? error.stack : undefined;
     console.error('Task creation error:', errorMessage, errorStack)
     
-    // Include error details in response for debugging (in production, you might want to hide this)
+    // Include error details in response for debugging
+    // TODO: Remove details from production response once issue is resolved
     return NextResponse.json(
       { 
         error: 'Failed to create task',
-        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+        details: errorMessage
       },
       { status: 500 }
     )
