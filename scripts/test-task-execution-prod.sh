@@ -19,11 +19,23 @@ MAX_WAIT_TIME="${MAX_WAIT_TIME:-600}"  # 10 minutes max wait
 POLL_INTERVAL="${POLL_INTERVAL:-5}"    # Poll every 5 seconds
 VERBOSE="${VERBOSE:-false}"
 
-# Test scenarios (complexity levels)
-declare -A TEST_SCENARIOS
-TEST_SCENARIOS[simple]="Update the README.md file to add a 'Testing' section with instructions on how to run tests"
-TEST_SCENARIOS[medium]="Add a new file called CONTRIBUTING.md with guidelines for contributors, including code style and PR process"
-TEST_SCENARIOS[complex]="Create a new API endpoint /api/health that returns a JSON response with status: 'ok' and timestamp. Include proper error handling and add it to the main router."
+# Test scenarios (complexity levels) - using functions instead of associative arrays for compatibility
+get_scenario_description() {
+  case "$1" in
+    simple)
+      echo "Update the README.md file to add a 'Testing' section with instructions on how to run tests"
+      ;;
+    medium)
+      echo "Add a new file called CONTRIBUTING.md with guidelines for contributors, including code style and PR process"
+      ;;
+    complex)
+      echo "Create a new API endpoint /api/health that returns a JSON response with status: 'ok' and timestamp. Include proper error handling and add it to the main router."
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
 
 # Parse arguments
 SCENARIO=""
@@ -148,14 +160,16 @@ fi
 
 # Set task details from scenario or custom
 if [ -n "$SCENARIO" ]; then
-  if [ -z "${TEST_SCENARIOS[$SCENARIO]:-}" ]; then
+  TASK_DESCRIPTION=$(get_scenario_description "$SCENARIO")
+  if [ -z "$TASK_DESCRIPTION" ]; then
     echo -e "${RED}Error: Unknown scenario: $SCENARIO${NC}"
-    echo "Available scenarios: ${!TEST_SCENARIOS[*]}"
+    echo "Available scenarios: simple, medium, complex"
     exit 1
   fi
-  TASK_DESCRIPTION="${TEST_SCENARIOS[$SCENARIO]}"
   if [ -z "$TASK_TITLE" ]; then
-    TASK_TITLE="Test: ${SCENARIO^} scenario - $(date +%H:%M:%S)"
+    # Capitalize first letter of scenario
+    SCENARIO_TITLE=$(echo "$SCENARIO" | sed 's/^./\U&/')
+    TASK_TITLE="Test: ${SCENARIO_TITLE} scenario - $(date +%H:%M:%S)"
   fi
 fi
 
