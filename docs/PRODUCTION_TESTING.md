@@ -16,9 +16,14 @@ This enables faster iteration on fixes without manual testing.
 ## Prerequisites
 
 1. **Supabase Access Token**: You need a valid Supabase access token for authentication
-   - Get it from your browser's dev tools (Network tab → look for Authorization header)
-   - Or from Supabase dashboard
+   - **Easiest method**: Log into the production app in your browser, open DevTools (F12), go to Network tab
+   - Make any API request (e.g., load the repos page)
+   - Look for a request to `/api/repo` or similar
+   - In the Request Headers, find the `Authorization` header
+   - Copy the token value (it will be something like `Bearer eyJhbGc...`)
+   - Extract just the token part (remove "Bearer " prefix)
    - Set as environment variable: `export SUPABASE_ACCESS_TOKEN="your-token"`
+   - **Alternative**: Get from Supabase dashboard → Authentication → Sessions
 
 2. **Repository**: The repository must be connected in the production app
    - Connect it via the UI first, or
