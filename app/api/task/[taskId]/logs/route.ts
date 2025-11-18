@@ -14,7 +14,7 @@ export async function GET(
     const { taskId } = await params
     
     // Get authenticated user
-    const supabase = createClient()
+    const supabase = await createClient()
     const {
       data: { user },
       error: authError,
