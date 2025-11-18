@@ -1,13 +1,23 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/auth/supabase-server'
+import { createClientWithToken } from '@/lib/auth/supabase-server-with-token'
 import { convexClient } from '@/lib/convex/server'
 import { api } from '@/convex/_generated/api'
 import { Doc } from '@/convex/_generated/dataModel'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Get authenticated user
-    const supabase = createClient()
+    // Support both cookie-based and Bearer token authentication
+    const authHeader = request.headers.get('authorization')
+    const token = authHeader?.startsWith('Bearer ') 
+      ? authHeader.substring(7) 
+      : undefined
+
+    // Get authenticated user (using token if provided, otherwise cookies)
+    const supabase = token 
+      ? createClientWithToken(token)
+      : createClient()
+    
     const {
       data: { user },
     } = await supabase.auth.getUser()
