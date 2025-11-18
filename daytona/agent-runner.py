@@ -791,54 +791,54 @@ def generate_patch_from_modified_files(
                     temp_file = f.name
                 
                 try:
-                # Use git diff --no-index to create patch for new file
-                result = subprocess.run(
-                    ['git', 'diff', '--no-index', '--', '/dev/null', temp_file],
-                    capture_output=True,
-                    text=True,
-                    cwd=repo_path,
-                )
-                
-                if result.returncode != 1:
-                    # git diff returns 1 when files differ (which is what we want for new files)
-                    # 0 means no differences (shouldn't happen for new file)
-                    # >1 means error
-                    if result.returncode == 0:
-                        print(f"[pj] Warning: No differences found for new file {file_path}", file=sys.stderr)
-                    else:
-                        raise RuntimeError(f"git diff failed with exit code {result.returncode}: {result.stderr}")
-                
-                # Replace temp file paths with actual file paths
-                # git diff outputs: --- /dev/null, +++ b/tmp/... 
-                # For new files, we keep /dev/null in --- line, only replace +++ line
-                # Format should be: --- /dev/null, +++ b/file_path
-                patch_content = result.stdout
-                import re
-                # Replace the temp file path in +++ line
-                # git diff outputs: +++ b/tmp/... or +++ b/var/folders/...
-                # We need: +++ b/file_path
-                # Match +++ b/ followed by any path (including temp file path)
-                patch_content = re.sub(
-                    r'\+\+\+ b/[^\s]+',
-                    f'+++ b/{file_path}',
-                    patch_content
-                )
-                # Fix the diff --git line
-                # Format: diff --git /dev/null b/tmp/...
-                # We need: diff --git a/file_path b/file_path
-                # For new files, git diff uses /dev/null, but unified diff format uses a/file_path
-                patch_content = re.sub(
-                    r'diff --git /dev/null b/[^\s]+',
-                    f'diff --git a/{file_path} b/{file_path}',
-                    patch_content
-                )
-                # Also handle case where diff --git might have different format
-                patch_content = re.sub(
-                    r'diff --git [^\s]+ [^\s]+',
-                    f'diff --git a/{file_path} b/{file_path}',
-                    patch_content,
-                    count=1  # Only replace first occurrence per patch
-                )
+                    # Use git diff --no-index to create patch for new file
+                    result = subprocess.run(
+                        ['git', 'diff', '--no-index', '--', '/dev/null', temp_file],
+                        capture_output=True,
+                        text=True,
+                        cwd=repo_path,
+                    )
+                    
+                    if result.returncode != 1:
+                        # git diff returns 1 when files differ (which is what we want for new files)
+                        # 0 means no differences (shouldn't happen for new file)
+                        # >1 means error
+                        if result.returncode == 0:
+                            print(f"[pj] Warning: No differences found for new file {file_path}", file=sys.stderr)
+                        else:
+                            raise RuntimeError(f"git diff failed with exit code {result.returncode}: {result.stderr}")
+                    
+                    # Replace temp file paths with actual file paths
+                    # git diff outputs: --- /dev/null, +++ b/tmp/... 
+                    # For new files, we keep /dev/null in --- line, only replace +++ line
+                    # Format should be: --- /dev/null, +++ b/file_path
+                    patch_content = result.stdout
+                    import re
+                    # Replace the temp file path in +++ line
+                    # git diff outputs: +++ b/tmp/... or +++ b/var/folders/...
+                    # We need: +++ b/file_path
+                    # Match +++ b/ followed by any path (including temp file path)
+                    patch_content = re.sub(
+                        r'\+\+\+ b/[^\s]+',
+                        f'+++ b/{file_path}',
+                        patch_content
+                    )
+                    # Fix the diff --git line
+                    # Format: diff --git /dev/null b/tmp/...
+                    # We need: diff --git a/file_path b/file_path
+                    # For new files, git diff uses /dev/null, but unified diff format uses a/file_path
+                    patch_content = re.sub(
+                        r'diff --git /dev/null b/[^\s]+',
+                        f'diff --git a/{file_path} b/{file_path}',
+                        patch_content
+                    )
+                    # Also handle case where diff --git might have different format
+                    patch_content = re.sub(
+                        r'diff --git [^\s]+ [^\s]+',
+                        f'diff --git a/{file_path} b/{file_path}',
+                        patch_content,
+                        count=1  # Only replace first occurrence per patch
+                    )
                     patches.append(patch_content)
                 finally:
                     os.unlink(temp_file)
@@ -880,8 +880,16 @@ def generate_patch_from_modified_files(
                     # Replace temp file paths with actual file paths
                     import re
                     # Replace the original file path (absolute) with relative path
+                    # Handle both absolute paths and relative paths in the patch
                     patch_content = re.sub(r'--- a/[^\s]+', f'--- a/{file_path}', patch_content)
                     patch_content = re.sub(r'\+\+\+ b/[^\s]+', f'+++ b/{file_path}', patch_content)
+                    # Also fix the diff --git line if it has absolute paths
+                    patch_content = re.sub(
+                        r'diff --git [^\s]+ [^\s]+',
+                        f'diff --git a/{file_path} b/{file_path}',
+                        patch_content,
+                        count=1  # Only replace first occurrence per patch
+                    )
                     patches.append(patch_content)
                 else:
                     raise RuntimeError(f"git diff failed with exit code {result.returncode}: {result.stderr}")

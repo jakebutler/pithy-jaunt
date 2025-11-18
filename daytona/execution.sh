@@ -595,34 +595,45 @@ else
   echo "[pj] No changes to commit"
 fi
 
-# Push branch
-echo "[pj] Pushing branch to remote..."
-if ! git push origin "$BRANCH"; then
-  handle_error "Failed to push branch to remote"
-fi
-
-echo "[pj] Branch pushed successfully"
-
-# Create PR using GitHub REST API
-echo "[pj] Creating pull request..."
-
-# Parse repository URL to extract owner and repo
-# Supports both https://github.com/owner/repo.git and git@github.com:owner/repo.git
-REPO_URL="$TARGET_REPO"
-if [[ "$REPO_URL" =~ github\.com[:/]([^/]+)/([^/]+?)(\.git)?$ ]]; then
-  REPO_OWNER="${BASH_REMATCH[1]}"
-  REPO_NAME="${BASH_REMATCH[2]}"
-  # Remove .git suffix if present
-  REPO_NAME="${REPO_NAME%.git}"
-  echo "[pj] Repository: $REPO_OWNER/$REPO_NAME"
+# Push branch (skip if SKIP_PUSH_TO_REMOTE is set)
+if [ "${SKIP_PUSH_TO_REMOTE:-false}" != "true" ]; then
+  echo "[pj] Pushing branch to remote..."
+  if ! git push origin "$BRANCH"; then
+    handle_error "Failed to push branch to remote"
+  fi
+  echo "[pj] Branch pushed successfully"
 else
-  handle_error "Failed to parse repository URL: $REPO_URL"
+  echo "[pj] Skipping push to remote (SKIP_PUSH_TO_REMOTE=true)"
 fi
 
-# Validate GitHub token
-if [ -z "${GITHUB_TOKEN:-}" ]; then
-  handle_error "GITHUB_TOKEN is required to create pull request"
-fi
+# Create PR using GitHub REST API (skip if SKIP_PR_CREATION is set)
+if [ "${SKIP_PR_CREATION:-false}" = "true" ]; then
+  echo "[pj] Skipping PR creation (SKIP_PR_CREATION=true)"
+  PR_URL=""
+else
+  echo "[pj] Creating pull request..."
+
+  # Parse repository URL to extract owner and repo
+  # Supports both https://github.com/owner/repo.git and git@github.com:owner/repo.git
+  # Also handles URLs without .git suffix and with dashes in repo name
+  REPO_URL="$TARGET_REPO"
+  # Remove trailing slash if present
+  REPO_URL="${REPO_URL%/}"
+  # Try to match the pattern
+  if [[ "$REPO_URL" =~ github\.com[:/]([^/]+)/([^/]+?)(\.git)?/?$ ]]; then
+    REPO_OWNER="${BASH_REMATCH[1]}"
+    REPO_NAME="${BASH_REMATCH[2]}"
+    # Remove .git suffix if present
+    REPO_NAME="${REPO_NAME%.git}"
+    echo "[pj] Repository: $REPO_OWNER/$REPO_NAME"
+  else
+    handle_error "Failed to parse repository URL: $REPO_URL"
+  fi
+
+  # Validate GitHub token
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    handle_error "GITHUB_TOKEN is required to create pull request"
+  fi
 
 # Build validation summary for PR body
 VALIDATION_SUMMARY=""
@@ -654,9 +665,9 @@ $AGENT_PROMPT
 ${VALIDATION_SUMMARY:-- ⚠️  No validation checks were run}
 "
 
-# Create PR using GitHub REST API
-PR_URL=""
-PR_PAYLOAD=$(cat <<EOF
+  # Create PR using GitHub REST API
+  PR_URL=""
+  PR_PAYLOAD=$(cat <<EOF
 {
   "title": "Pithy Jaunt: $TASK_ID",
   "body": $(echo "$PR_BODY" | jq -Rs .),
@@ -664,51 +675,52 @@ PR_PAYLOAD=$(cat <<EOF
   "base": "$BASE_BRANCH"
 }
 EOF
-)
+  )
 
-# Temporarily disable exit on error to handle PR creation errors
-set +e
-PR_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-  "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/pulls" \
-  -H "Authorization: token $GITHUB_TOKEN" \
-  -H "Accept: application/vnd.github.v3+json" \
-  -H "Content-Type: application/json" \
-  -d "$PR_PAYLOAD" 2>&1)
-PR_HTTP_CODE=$(echo "$PR_RESPONSE" | tail -1)
-PR_BODY_RESPONSE=$(echo "$PR_RESPONSE" | sed '$d')
-set -e
-
-if [ "$PR_HTTP_CODE" = "201" ]; then
-  # PR created successfully
-  PR_URL=$(echo "$PR_BODY_RESPONSE" | jq -r '.html_url // .url // ""')
-  if [ -z "$PR_URL" ] || [ "$PR_URL" = "null" ]; then
-    # Fallback: construct URL manually
-    PR_URL="https://github.com/$REPO_OWNER/$REPO_NAME/pull/$(echo "$PR_BODY_RESPONSE" | jq -r '.number')"
-  fi
-  echo "[pj] Pull request created: $PR_URL"
-elif [ "$PR_HTTP_CODE" = "422" ]; then
-  # PR might already exist, try to find it
-  echo "[pj] PR creation returned 422, checking if PR already exists..."
+  # Temporarily disable exit on error to handle PR creation errors
   set +e
-  EXISTING_PR=$(curl -s -X GET \
-    "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/pulls?head=$REPO_OWNER:$BRANCH&state=all" \
+  PR_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+    "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/pulls" \
     -H "Authorization: token $GITHUB_TOKEN" \
-    -H "Accept: application/vnd.github.v3+json" 2>&1)
+    -H "Accept: application/vnd.github.v3+json" \
+    -H "Content-Type: application/json" \
+    -d "$PR_PAYLOAD" 2>&1)
+  PR_HTTP_CODE=$(echo "$PR_RESPONSE" | tail -1)
+  PR_BODY_RESPONSE=$(echo "$PR_RESPONSE" | sed '$d')
   set -e
-  
-  EXISTING_PR_URL=$(echo "$EXISTING_PR" | jq -r '.[0].html_url // .[0].url // ""' 2>/dev/null || echo "")
-  if [ -n "$EXISTING_PR_URL" ] && [ "$EXISTING_PR_URL" != "null" ]; then
-    PR_URL="$EXISTING_PR_URL"
-    echo "[pj] Pull request already exists: $PR_URL"
+
+  if [ "$PR_HTTP_CODE" = "201" ]; then
+    # PR created successfully
+    PR_URL=$(echo "$PR_BODY_RESPONSE" | jq -r '.html_url // .url // ""')
+    if [ -z "$PR_URL" ] || [ "$PR_URL" = "null" ]; then
+      # Fallback: construct URL manually
+      PR_URL="https://github.com/$REPO_OWNER/$REPO_NAME/pull/$(echo "$PR_BODY_RESPONSE" | jq -r '.number')"
+    fi
+    echo "[pj] Pull request created: $PR_URL"
+  elif [ "$PR_HTTP_CODE" = "422" ]; then
+    # PR might already exist, try to find it
+    echo "[pj] PR creation returned 422, checking if PR already exists..."
+    set +e
+    EXISTING_PR=$(curl -s -X GET \
+      "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/pulls?head=$REPO_OWNER:$BRANCH&state=all" \
+      -H "Authorization: token $GITHUB_TOKEN" \
+      -H "Accept: application/vnd.github.v3+json" 2>&1)
+    set -e
+    
+    EXISTING_PR_URL=$(echo "$EXISTING_PR" | jq -r '.[0].html_url // .[0].url // ""' 2>/dev/null || echo "")
+    if [ -n "$EXISTING_PR_URL" ] && [ "$EXISTING_PR_URL" != "null" ]; then
+      PR_URL="$EXISTING_PR_URL"
+      echo "[pj] Pull request already exists: $PR_URL"
+    else
+      # Parse error message from response
+      ERROR_MSG=$(echo "$PR_BODY_RESPONSE" | jq -r '.message // "Unknown error"' 2>/dev/null || echo "Failed to create PR (HTTP $PR_HTTP_CODE)")
+      handle_error "Failed to create pull request: $ERROR_MSG"
+    fi
   else
-    # Parse error message from response
+    # Other error
     ERROR_MSG=$(echo "$PR_BODY_RESPONSE" | jq -r '.message // "Unknown error"' 2>/dev/null || echo "Failed to create PR (HTTP $PR_HTTP_CODE)")
     handle_error "Failed to create pull request: $ERROR_MSG"
   fi
-else
-  # Other error
-  ERROR_MSG=$(echo "$PR_BODY_RESPONSE" | jq -r '.message // "Unknown error"' 2>/dev/null || echo "Failed to create PR (HTTP $PR_HTTP_CODE)")
-  handle_error "Failed to create pull request: $ERROR_MSG"
 fi
 
 # Browser Use tests are now run as part of post-apply validation above

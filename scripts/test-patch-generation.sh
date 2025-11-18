@@ -58,8 +58,16 @@ if [ -z "${OPENAI_API_KEY:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
   exit 1
 fi
 
-# Determine provider
-PROVIDER="${MODEL_PROVIDER:-openai}"
+# Determine provider - default to openai if both keys are available
+if [ -n "${OPENAI_API_KEY:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+  PROVIDER="openai"
+elif [ -n "${ANTHROPIC_API_KEY:-}" ] && [ -z "${OPENAI_API_KEY:-}" ]; then
+  PROVIDER="anthropic"
+elif [ -n "${MODEL_PROVIDER:-}" ]; then
+  PROVIDER="${MODEL_PROVIDER}"
+else
+  PROVIDER="openai"  # Default to openai
+fi
 MODEL="${MODEL:-gpt-4o}"
 
 if [ "$PROVIDER" = "anthropic" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
