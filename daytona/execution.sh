@@ -308,6 +308,8 @@ if [ -n "$(git status --porcelain | grep -v '.coderabbit.yaml')" ]; then
   git status --short
 fi
 
+# Capture stderr from agent-runner for better error reporting
+AGENT_RUNNER_STDERR=$(mktemp)
 if ! python3 "$AGENT_RUNNER" \
   --prompt-file "$SYSTEM_PROMPT" \
   --task "$AGENT_PROMPT" \
@@ -315,9 +317,26 @@ if ! python3 "$AGENT_RUNNER" \
   --out /tmp/patch.diff \
   --provider "${MODEL_PROVIDER:-openai}" \
   --model "${MODEL:-gpt-4o}" \
-  --use-two-step; then
-  handle_error "AI agent failed to generate patch"
+  --use-two-step 2>"$AGENT_RUNNER_STDERR"; then
+  # Read stderr for detailed error information
+  AGENT_ERROR=$(cat "$AGENT_RUNNER_STDERR" 2>/dev/null || echo "Could not read agent-runner stderr")
+  rm -f "$AGENT_RUNNER_STDERR"
+  
+  # Include stderr in error details
+  ERROR_DETAILS="AI agent failed to generate patch"
+  if [ -n "$AGENT_ERROR" ]; then
+    ERROR_DETAILS="$ERROR_DETAILS\n\nAgent-runner stderr:\n$AGENT_ERROR"
+  fi
+  
+  # Also check if patch file exists (might give us clues)
+  if [ -f /tmp/patch.diff ]; then
+    PATCH_PREVIEW=$(head -50 /tmp/patch.diff 2>/dev/null || echo "Could not read patch file")
+    ERROR_DETAILS="$ERROR_DETAILS\n\nPatch file exists but agent failed. Preview:\n$PATCH_PREVIEW"
+  fi
+  
+  handle_error "AI agent failed to generate patch" "$ERROR_DETAILS"
 fi
+rm -f "$AGENT_RUNNER_STDERR"
 
 # Check if patch file exists and is not empty
 if [ ! -f /tmp/patch.diff ] || [ ! -s /tmp/patch.diff ]; then
