@@ -123,7 +123,18 @@ export function buildPithyJauntImage(): Image {
     );
   }
 
-  // Add execution script
+  // Add bootstrap script (downloads latest scripts at runtime)
+  const bootstrapPath = path.join(daytonaDir, "bootstrap.sh");
+  if (fs.existsSync(bootstrapPath)) {
+    image = image.addLocalFile(
+      bootstrapPath,
+      "/app/bootstrap.sh"
+    );
+    image = image.runCommands("chmod +x /app/bootstrap.sh");
+  }
+
+  // Add scripts as fallback (in case GitHub is unavailable)
+  // These will be overwritten by bootstrap.sh if download succeeds
   const executionScriptPath = path.join(daytonaDir, "execution.sh");
   if (fs.existsSync(executionScriptPath)) {
     image = image.addLocalFile(
@@ -134,7 +145,8 @@ export function buildPithyJauntImage(): Image {
   }
 
   // Set default command (will be overridden by Daytona template init script)
-  image = image.cmd(["/app/execution.sh"]);
+  // Use bootstrap.sh which downloads latest scripts, then runs execution.sh
+  image = image.cmd(["/app/bootstrap.sh"]);
 
   return image;
 }

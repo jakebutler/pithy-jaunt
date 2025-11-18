@@ -108,6 +108,9 @@ export async function createWorkspace(params: CreateWorkspaceParams): Promise<{
       MODEL: params.model,
       WEBHOOK_URL: `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")}/api/webhook/daytona`,
       KEEP_ALIVE: params.keepWorkspaceAlive ? "true" : "false",
+      // Script download configuration (optional - defaults to main branch)
+      SCRIPT_REPO: process.env.SCRIPT_REPO || "jakebutler/pithy-jaunt",
+      SCRIPT_BRANCH: process.env.SCRIPT_BRANCH || "main", // Can be set to commit SHA or tag for pinning
     },
   };
 

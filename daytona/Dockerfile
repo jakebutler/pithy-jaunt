@@ -57,15 +57,17 @@ RUN pip3 install --no-cache-dir -r /app/requirements.txt
 RUN pip3 install playwright && \
     playwright install chromium --with-deps
 
-# Copy agent runner and system prompts
+# Copy bootstrap script (this will download latest scripts at runtime)
+COPY daytona/bootstrap.sh /app/bootstrap.sh
+RUN chmod +x /app/bootstrap.sh
+
+# Copy scripts as fallback (in case GitHub is unavailable)
+# These will be overwritten by bootstrap.sh if download succeeds
 COPY daytona/agent-runner.py /app/agent-runner.py
 COPY daytona/system-prompt.md /app/system-prompt.md
 COPY daytona/system-prompt-file-generation.md /app/system-prompt-file-generation.md
-RUN chmod +x /app/agent-runner.py
-
-# Copy execution script
 COPY daytona/execution.sh /app/execution.sh
-RUN chmod +x /app/execution.sh
+RUN chmod +x /app/agent-runner.py /app/execution.sh
 
 # Set up git configuration (will be overridden by workspace)
 RUN git config --global init.defaultBranch main
@@ -74,5 +76,6 @@ RUN git config --global init.defaultBranch main
 RUN mkdir -p /tmp/pj
 
 # Default command (will be overridden by Daytona template init script)
-CMD ["/app/execution.sh"]
+# Use bootstrap.sh which downloads latest scripts, then runs execution.sh
+CMD ["/app/bootstrap.sh"]
 
