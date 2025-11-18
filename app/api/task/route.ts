@@ -17,14 +17,20 @@ export async function POST(request: NextRequest) {
     let supabase
     let user
     
-    if (token) {
-      supabase = await createClientWithToken(token)
-      const result = await supabase.auth.getUser()
-      user = result.data.user
-    } else {
-      supabase = await createClient()
-      const result = await supabase.auth.getUser()
-      user = result.data.user
+    try {
+      if (token) {
+        supabase = await createClientWithToken(token)
+        const result = await supabase.auth.getUser()
+        user = result.data.user
+      } else {
+        supabase = await createClient()
+        const result = await supabase.auth.getUser()
+        user = result.data.user
+      }
+    } catch (authError: unknown) {
+      const errorMessage = authError instanceof Error ? authError.message : String(authError)
+      console.error('Authentication error:', errorMessage)
+      return NextResponse.json({ error: 'Unauthorized', details: errorMessage }, { status: 401 })
     }
 
     if (!user) {
@@ -117,14 +123,20 @@ export async function GET(request: NextRequest) {
     let supabase
     let user
     
-    if (token) {
-      supabase = await createClientWithToken(token)
-      const result = await supabase.auth.getUser()
-      user = result.data.user
-    } else {
-      supabase = await createClient()
-      const result = await supabase.auth.getUser()
-      user = result.data.user
+    try {
+      if (token) {
+        supabase = await createClientWithToken(token)
+        const result = await supabase.auth.getUser()
+        user = result.data.user
+      } else {
+        supabase = await createClient()
+        const result = await supabase.auth.getUser()
+        user = result.data.user
+      }
+    } catch (authError: unknown) {
+      const errorMessage = authError instanceof Error ? authError.message : String(authError)
+      console.error('Authentication error:', errorMessage)
+      return NextResponse.json({ error: 'Unauthorized', details: errorMessage }, { status: 401 })
     }
 
     if (!user) {

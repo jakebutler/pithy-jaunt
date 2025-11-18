@@ -223,13 +223,13 @@ function api_request() {
   local http_code
   
   if [ -n "$data" ]; then
-    http_code=$(curl -s -w "%{http_code}" -o "$temp_file" -X "$method" \
+    http_code=$(curl -s --max-time 30 -w "%{http_code}" -o "$temp_file" -X "$method" \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
       -d "$data" \
       "$url")
   else
-    http_code=$(curl -s -w "%{http_code}" -o "$temp_file" -X "$method" \
+    http_code=$(curl -s --max-time 30 -w "%{http_code}" -o "$temp_file" -X "$method" \
       -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
       "$url")
   fi
