@@ -134,14 +134,9 @@ export async function POST(
       gitingestReport
     )
 
-    // Update task status to running
-    await convexClient.mutation(api.tasks.updateTaskStatus, {
-      taskId: task._id,
-      status: 'running',
-    })
-
     try {
       // Create Daytona workspace with enhanced prompt
+      // Don't set status to "running" yet - wait until workspace is created and script is started
       const workspace = await createWorkspace({
         repoUrl: repo.url,
         branch: repo.branch,
@@ -173,6 +168,12 @@ export async function POST(
         taskId: task._id,
         assignedWorkspaceId: workspace.workspaceId,
         branchName: `pj/${task._id}`,
+      })
+
+      // Only now mark task as running - workspace is created and script is executing
+      await convexClient.mutation(api.tasks.updateTaskStatus, {
+        taskId: task._id,
+        status: 'running',
       })
 
       return NextResponse.json(

@@ -127,16 +127,58 @@ export async function createWorkspaceViaSDK(
       snapshotUsed: USE_DECLARATIVE_IMAGE ? "N/A (declarative)" : DAYTONA_SNAPSHOT_NAME,
     });
 
+    // Wait for workspace runner to be ready before executing commands
+    // This is critical - the workspace may be created but the runner might not be assigned yet
+    console.log("[Daytona SDK] Waiting for workspace runner to be ready...");
+    const maxWaitTime = 60000; // 60 seconds max wait
+    const pollInterval = 2000; // Check every 2 seconds
+    const startTime = Date.now();
+    const sessionId = `task-${params.taskId}`;
+    let runnerReady = false;
+
+    // Try to create the actual session, retrying if runner isn't ready
+    while (!runnerReady && (Date.now() - startTime) < maxWaitTime) {
+      try {
+        await sandbox.process.createSession(sessionId);
+        runnerReady = true;
+        console.log("[Daytona SDK] Workspace runner is ready, session created");
+        break;
+      } catch (error: unknown) {
+        const err = error as { message?: string; statusCode?: number };
+        const errorMessage = err.message || String(error);
+        const statusCode = err.statusCode;
+        
+        if (errorMessage.includes("no runner assigned") || statusCode === 404) {
+          const elapsed = Date.now() - startTime;
+          console.log(`[Daytona SDK] Runner not ready yet, waiting... (${elapsed}ms elapsed)`);
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+        } else {
+          // Different error - might be a different issue, but try to continue
+          console.log("[Daytona SDK] Got different error when creating session:", errorMessage);
+          // If it's a session already exists error, that's fine - runner is ready
+          if (errorMessage.includes("already exists") || errorMessage.includes("duplicate")) {
+            runnerReady = true;
+            console.log("[Daytona SDK] Session already exists, runner is ready");
+            break;
+          }
+          // For other errors, wait a bit and retry once more
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+        }
+      }
+    }
+
+    if (!runnerReady) {
+      throw new Error("Workspace runner did not become ready within timeout period (60s)");
+    }
+
     // Execute the execution script in the workspace
     // The script is located at /app/execution.sh and will handle the entire task execution
     // We execute it asynchronously in a session so it doesn't block the API call
     // The script will run in the background and send webhooks as it progresses
+    // Note: sessionId is already created above during the wait loop
     console.log("[Daytona SDK] Executing task script in workspace...");
     
     try {
-      // Create a persistent session for this task execution
-      const sessionId = `task-${params.taskId}`;
-      await sandbox.process.createSession(sessionId);
 
       // Set environment variables in the session
       // Note: envVars are already set at workspace creation, but we ensure they're available in the session
@@ -172,16 +214,16 @@ export async function createWorkspaceViaSDK(
       // Don't wait for the script to complete - it will send webhooks as it progresses
       // The script will handle its own completion and send a webhook when done
     } catch (execError: unknown) {
-      // Log the error but don't fail the workspace creation
-      // The script might still work, or webhooks will report failures
+      // Script execution failed - this is a critical error
+      // We need to throw so the task can be marked as failed
       const error = execError instanceof Error ? execError : { message: String(execError), name: 'UnknownError', stack: undefined }
       console.error("[Daytona SDK] Error executing script:", {
         error: error.message,
         name: error.name,
         stack: error.stack,
       });
-      // Continue - the workspace is created, even if script execution failed
-      // Webhooks will report the actual status
+      // Throw the error so the task execution route can handle it properly
+      throw new Error(`Failed to execute task script in workspace: ${error.message}`);
     }
 
     return {
