@@ -19,7 +19,7 @@ export async function POST(
     console.log('[TASK EXECUTE] Task ID:', taskId)
     
     // Get authenticated user
-    const supabase = createClient()
+    const supabase = await createClient()
     const {
       data: { user },
       error: authError,

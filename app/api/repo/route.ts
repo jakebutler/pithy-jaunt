@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       const result = await supabase.auth.getUser()
       user = result.data.user
     } else {
-      supabase = createClient()
+      supabase = await createClient()
       const result = await supabase.auth.getUser()
       user = result.data.user
     }

@@ -7,7 +7,7 @@ import { Id } from '@/convex/_generated/dataModel'
 export async function POST(request: NextRequest) {
   try {
     // Get authenticated user
-    const supabase = createClient()
+    const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     // Get authenticated user
-    const supabase = createClient()
+    const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()

@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send magic link via Supabase
-    const supabase = createClient()
+    const supabase = await createClient()
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {

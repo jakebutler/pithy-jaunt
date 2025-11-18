@@ -13,7 +13,7 @@ export async function GET(
     const { repoId } = await params
 
     // Get authenticated user
-    const supabase = createClient()
+    const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -77,7 +77,7 @@ export async function POST(
     const { repoId } = await params
 
     // Get authenticated user
-    const supabase = createClient()
+    const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()

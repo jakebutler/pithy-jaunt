@@ -13,7 +13,7 @@ export async function POST(
     const { taskId } = await params
     
     // Get authenticated user
-    const supabase = createClient()
+    const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
