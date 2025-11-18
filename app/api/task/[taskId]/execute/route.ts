@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/auth/supabase-server'
+import { createClientWithToken } from '@/lib/auth/supabase-server-with-token'
 import { convexClient } from '@/lib/convex/server'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
@@ -18,12 +19,28 @@ export async function POST(
     const { taskId } = await params
     console.log('[TASK EXECUTE] Task ID:', taskId)
     
-    // Get authenticated user
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    // Support both cookie-based and Bearer token authentication
+    const authHeader = request.headers.get('authorization')
+    const token = authHeader?.startsWith('Bearer ') 
+      ? authHeader.substring(7) 
+      : undefined
+
+    // Get authenticated user (using token if provided, otherwise cookies)
+    let supabase
+    let user
+    let authError
+    
+    if (token) {
+      supabase = await createClientWithToken(token)
+      const result = await supabase.auth.getUser()
+      user = result.data.user
+      authError = result.error
+    } else {
+      supabase = await createClient()
+      const result = await supabase.auth.getUser()
+      user = result.data.user
+      authError = result.error
+    }
 
     if (authError || !user) {
       console.log('[TASK EXECUTE] No user found:', authError?.message)
