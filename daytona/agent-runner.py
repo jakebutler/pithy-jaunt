@@ -679,6 +679,7 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
     
     try:
         with timeout(180):  # 3 minute timeout
+            finish_reason = None
             if provider == "openai" or provider == "openrouter":
                 # Both OpenAI and OpenRouter use OpenAI-compatible API
                 response = client.chat.completions.create(
@@ -688,15 +689,18 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
                         {"role": "user", "content": user_prompt},
                     ],
                     temperature=0.0,
-                    max_tokens=16000,
+                    max_tokens=32000,  # Increased to prevent truncation of large file content
                 )
                 content = response.choices[0].message.content.strip()
+                finish_reason = response.choices[0].message.finish_reason
                 usage = response.usage
                 print(f"[pj] Token usage: {usage.total_tokens} (prompt: {usage.prompt_tokens}, completion: {usage.completion_tokens})", file=sys.stderr)
+                if finish_reason == "length":
+                    print(f"[pj] WARNING: LLM response was truncated (finish_reason: length). Content may be incomplete.", file=sys.stderr)
             else:  # anthropic
                 message = client.messages.create(
                     model=model,
-                    max_tokens=16384,
+                    max_tokens=32768,  # Increased to prevent truncation of large file content
                     temperature=0.0,
                     system=system_prompt,
                     messages=[
@@ -704,50 +708,85 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
                     ],
                 )
                 content = message.content[0].text.strip()
+                finish_reason = message.stop_reason
                 usage = message.usage
                 print(f"[pj] Token usage: {usage.input_tokens} input, {usage.output_tokens} output", file=sys.stderr)
+                if finish_reason == "max_tokens":
+                    print(f"[pj] WARNING: LLM response was truncated (stop_reason: max_tokens). Content may be incomplete.", file=sys.stderr)
             
             # Parse the response to extract file contents
             modified_files = {}
             current_file = None
             current_content = []
             
+            # Clean content - remove any markdown code blocks that might have been added
+            if "```" in content:
+                # Try to extract content from code blocks
+                import re
+                code_block_pattern = r"```(?:[a-z]+)?\n?(.*?)```"
+                matches = re.findall(code_block_pattern, content, re.DOTALL)
+                if matches:
+                    # Use content from code blocks
+                    content = matches[-1].strip()  # Use last match (most likely the actual content)
+                    print(f"[pj] Extracted content from markdown code block", file=sys.stderr)
+            
             for line in content.split('\n'):
+                # Stop parsing if we hit debug/error messages
+                if any(artifact in line.lower() for artifact in ['patch preview', 'error:', 'traceback', 'debug:', 'warning:']):
+                    print(f"[pj] WARNING: Stopping file parsing at line containing: {line[:50]}", file=sys.stderr)
+                    break
+                    
                 if line.startswith('FILE: '):
                     # Save previous file if any
                     if current_file and current_content:
-                        modified_files[current_file] = '\n'.join(current_content).rstrip() + '\n'
+                        file_content = '\n'.join(current_content).rstrip() + '\n'
+                        # Validate content is not empty and doesn't look corrupted
+                        if file_content.strip() and not file_content.startswith('\\n'):
+                            modified_files[current_file] = file_content
+                        else:
+                            print(f"[pj] WARNING: Skipping corrupted file content for {current_file}", file=sys.stderr)
                     # Start new file
                     current_file = line[6:].strip()  # Remove 'FILE: ' prefix
                     current_content = []
                 elif line == '---' and current_file:
                     # End of file
                     if current_content:
-                        modified_files[current_file] = '\n'.join(current_content).rstrip() + '\n'
+                        file_content = '\n'.join(current_content).rstrip() + '\n'
+                        # Validate content is not empty and doesn't look corrupted
+                        if file_content.strip() and not file_content.startswith('\\n'):
+                            modified_files[current_file] = file_content
+                        else:
+                            print(f"[pj] WARNING: Skipping corrupted file content for {current_file}", file=sys.stderr)
                     current_file = None
                     current_content = []
                 elif current_file:
-                    current_content.append(line)
+                    # Skip lines that look like debug output
+                    if not any(artifact in line.lower() for artifact in ['patch preview', 'error:', 'traceback']):
+                        current_content.append(line)
             
             # Save last file if any
             if current_file and current_content:
-                modified_files[current_file] = '\n'.join(current_content).rstrip() + '\n'
+                file_content = '\n'.join(current_content).rstrip() + '\n'
+                # Validate content is not empty and doesn't look corrupted
+                if file_content.strip() and not file_content.startswith('\\n'):
+                    modified_files[current_file] = file_content
+                else:
+                    print(f"[pj] WARNING: Skipping corrupted file content for {current_file}", file=sys.stderr)
             
-            # If no FILE: markers found, try to infer from task description
+            # Validate we got at least one file
             if not modified_files:
-                # Extract explicitly mentioned files from task description
-                task_lower = task_description.lower()
-                for file_path, _ in relevant_files:
-                    file_name = file_path.split('/')[-1]
-                    if file_path in task_description or file_name in task_description:
-                        # Try to extract file content from response
-                        modified_files[file_path] = content
-                        break
-                
-                # If still no files, use first relevant file as fallback
-                if not modified_files and relevant_files:
-                    file_path = relevant_files[0][0]
-                    modified_files[file_path] = content
+                print(f"[pj] ERROR: No valid file content extracted from LLM response", file=sys.stderr)
+                print(f"[pj] Response preview (first 500 chars): {content[:500]}", file=sys.stderr)
+                raise RuntimeError("Failed to extract file content from LLM response. Response may be truncated or malformed.")
+            
+            # Validate file contents don't contain obvious corruption
+            for file_path, file_content in modified_files.items():
+                # Check for literal \n sequences (should be actual newlines)
+                if '\\n' in file_content and file_content.count('\\n') > file_content.count('\n'):
+                    print(f"[pj] WARNING: File {file_path} contains literal \\n sequences - may be corrupted", file=sys.stderr)
+                # Check for incomplete content (ends mid-sentence or has placeholder text)
+                if file_content.strip().endswith(('...', '...\n', 'TODO', 'FIXME')):
+                    print(f"[pj] WARNING: File {file_path} may be incomplete (ends with placeholder)", file=sys.stderr)
             
             return modified_files
             
@@ -1020,7 +1059,21 @@ def main():
                 args.out,
             )
             
+            # Validate the generated patch
+            if not patch or not patch.strip():
+                raise RuntimeError("Generated patch is empty")
+            
+            # Check for obvious corruption in the patch
+            if '\\n' in patch and patch.count('\\n') > patch.count('\n') * 2:
+                print(f"[pj] WARNING: Patch contains many literal \\n sequences - may be corrupted", file=sys.stderr)
+            
+            # Validate patch format
+            if not patch.startswith(('--- ', 'diff --git')):
+                print(f"[pj] WARNING: Patch doesn't start with expected header (--- or diff --git)", file=sys.stderr)
+                print(f"[pj] Patch preview (first 200 chars): {patch[:200]}", file=sys.stderr)
+            
             print(f"[pj] Patch generated successfully using git diff: {args.out}", file=sys.stderr)
+            print(f"[pj] Patch size: {len(patch)} characters, {len(patch.splitlines())} lines", file=sys.stderr)
             
         else:
             # Original approach: generate diff directly
