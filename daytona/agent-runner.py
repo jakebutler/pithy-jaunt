@@ -1107,15 +1107,22 @@ def main():
         # Use file generation prompt for two-step approach, otherwise use diff prompt
         if args.use_two_step:
             prompt_file = args.prompt_file.parent / "system-prompt-file-generation.md"
+            print(f"[pj] DEBUG: Looking for system prompt at: {prompt_file}", file=sys.stderr)
+            print(f"[pj] DEBUG: Prompt file exists: {prompt_file.exists()}", file=sys.stderr)
             if not prompt_file.exists():
                 # Fall back to original prompt if file generation prompt doesn't exist
                 prompt_file = args.prompt_file
                 print(f"[pj] Warning: system-prompt-file-generation.md not found, using {args.prompt_file}", file=sys.stderr)
             system_prompt = load_system_prompt(prompt_file)
+            print(f"[pj] DEBUG: System prompt loaded successfully, length: {len(system_prompt)} chars", file=sys.stderr)
+            print(f"[pj] DEBUG: System prompt first 200 chars: {system_prompt[:200]}", file=sys.stderr)
         else:
             system_prompt = load_system_prompt(args.prompt_file)
+            print(f"[pj] DEBUG: System prompt loaded (non-two-step), length: {len(system_prompt)} chars", file=sys.stderr)
     except Exception as e:
         print(f"[pj] Error loading system prompt: {e}", file=sys.stderr)
+        import traceback
+        print(f"[pj] Traceback: {traceback.format_exc()}", file=sys.stderr)
         sys.exit(1)
     
     # Analyze codebase
