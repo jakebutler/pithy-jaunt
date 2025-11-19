@@ -791,6 +791,11 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
                 
                 if finish_reason == "length":
                     print(f"[pj] WARNING: LLM response was truncated (finish_reason: length). Content may be incomplete.", file=sys.stderr)
+                
+                # Debug: Log first part of response to help diagnose issues
+                print(f"[pj] DEBUG: Full LLM response (first 500 chars): {content[:500]}", file=sys.stderr)
+                print(f"[pj] DEBUG: System prompt length: {len(system_prompt)} chars", file=sys.stderr)
+                print(f"[pj] DEBUG: User prompt length: {len(user_prompt)} chars", file=sys.stderr)
             else:  # anthropic
                 message = client.messages.create(
                     model=model,
