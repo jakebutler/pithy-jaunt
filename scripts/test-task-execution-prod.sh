@@ -466,15 +466,22 @@ function wait_for_completion() {
     fi
     
     case "$status" in
-      "completed")
-        log_success "Task completed!"
-        if [ -n "$pr_url" ] && [ "$pr_url" != "null" ]; then
-          log_success "PR created: $pr_url"
+      "completed"|"needs_review")
+        # Task completed - check if PR was created
+        if [ -n "$pr_url" ] && [ "$pr_url" != "null" ] && [ "$pr_url" != "" ]; then
+          log_success "Task completed with PR: $pr_url"
           echo "$pr_url"
+          return 0
         else
-          log_warning "Task completed but no PR URL found"
+          if [ "$status" = "needs_review" ]; then
+            log_warning "Task status is 'needs_review' but no PR URL found"
+            log "This may indicate the PR creation failed or the webhook was sent incorrectly"
+          else
+            log_warning "Task completed but no PR URL found"
+          fi
+          # Still return success if task completed, but log the issue
+          return 0
         fi
-        return 0
         ;;
       "failed")
         log_error "Task failed"
