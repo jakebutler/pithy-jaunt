@@ -66,9 +66,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ repos: formattedRepos }, { status: 200 })
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error('Error fetching repositories:', errorMessage)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error('Error fetching repositories:', errorMessage, errorStack)
     return NextResponse.json(
-      { error: 'Failed to fetch repositories' },
+      { 
+        error: 'Failed to fetch repositories',
+        details: errorMessage
+      },
       { status: 500 }
     )
   }
