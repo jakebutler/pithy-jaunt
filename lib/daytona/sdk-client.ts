@@ -59,6 +59,7 @@ export async function createWorkspaceViaSDK(
     AGENT_PROMPT: params.taskDescription,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",
     GITHUB_TOKEN: process.env.GITHUB_TOKEN || "",
     MODEL_PROVIDER: params.modelProvider,
     MODEL: params.model,
