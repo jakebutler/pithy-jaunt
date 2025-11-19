@@ -837,6 +837,20 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
             current_file = None
             current_content = []
             
+            # CRITICAL VALIDATION: Reject responses that don't start with "FILE:"
+            # This catches cases where the LLM returns shell commands, documentation, or other wrong content
+            content_stripped = content.strip()
+            if not content_stripped.startswith("FILE:"):
+                print(f"[pj] ERROR: LLM response does not start with 'FILE:' - this indicates wrong content type", file=sys.stderr)
+                print(f"[pj] Response starts with: {content_stripped[:200]}", file=sys.stderr)
+                print(f"[pj] This likely means the LLM returned shell commands, documentation, or instructions instead of file content", file=sys.stderr)
+                raise RuntimeError(
+                    f"LLM response does not start with 'FILE:' format. "
+                    f"Response preview: {content_stripped[:200]}. "
+                    f"The LLM may have returned shell commands, documentation, or instructions instead of the modified file content. "
+                    f"Expected format: 'FILE: <path>\\n<content>\\n---'"
+                )
+            
             # Clean content - remove any markdown code blocks that might have been added
             # BUT: Only extract if the content doesn't already start with "FILE:"
             # The LLM should output FILE: format directly, not wrapped in code blocks
