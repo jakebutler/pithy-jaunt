@@ -752,7 +752,14 @@ FILE: README.md
 ---
 ```
 
-Output ONLY the file content(s), with no explanations, no markdown formatting around the content itself."""
+Output ONLY the file content(s), with no explanations, no markdown formatting around the content itself.
+
+**CRITICAL REMINDER:**
+- You are modifying an EXISTING file - output the COMPLETE file from line 1 to the end
+- DO NOT output just a snippet or excerpt from the file
+- DO NOT output shell commands or instructions
+- You MUST include ALL existing content, then add the new section
+- The file shown above is the COMPLETE file - you need to output it ALL with your changes added"""
     
     try:
         with timeout(180):  # 3 minute timeout
