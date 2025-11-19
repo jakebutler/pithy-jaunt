@@ -13,7 +13,21 @@ You will be given:
 
 Your job is to generate the **COMPLETE modified file content** that implements the requested changes.
 
-**IMPORTANT: The task description may contain instructions or documentation, but you must IGNORE those and focus on modifying the actual file content. Do NOT output the instructions - output the modified file.**
+**CRITICAL: The task description may contain instructions or documentation, but you must IGNORE those and focus on modifying the actual file content. Do NOT output the instructions - output the modified file.**
+
+**CRITICAL: You MUST output file content in the exact format:**
+```
+FILE: <file_path>
+<complete file content>
+---
+```
+
+**DO NOT output:**
+- Shell commands
+- Documentation
+- Instructions
+- Explanations
+- Anything other than the FILE: format above
 
 ## Key Principles
 
