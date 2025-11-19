@@ -786,16 +786,18 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
                 finish_reason = getattr(choice, 'finish_reason', None)  # finish_reason is on the choice, not the message
                 usage = getattr(response, 'usage', None)
                 
+                # Debug: Log BEFORE any processing
+                print(f"[pj] DEBUG: Raw LLM response length: {len(content)} chars", file=sys.stderr)
+                print(f"[pj] DEBUG: Raw LLM response (first 1000 chars): {content[:1000]}", file=sys.stderr)
+                print(f"[pj] DEBUG: System prompt length: {len(system_prompt)} chars", file=sys.stderr)
+                print(f"[pj] DEBUG: User prompt length: {len(user_prompt)} chars", file=sys.stderr)
+                print(f"[pj] DEBUG: Finish reason: {finish_reason}", file=sys.stderr)
+                
                 if usage:
                     print(f"[pj] Token usage: {usage.total_tokens} (prompt: {usage.prompt_tokens}, completion: {usage.completion_tokens})", file=sys.stderr)
                 
                 if finish_reason == "length":
                     print(f"[pj] WARNING: LLM response was truncated (finish_reason: length). Content may be incomplete.", file=sys.stderr)
-                
-                # Debug: Log first part of response to help diagnose issues
-                print(f"[pj] DEBUG: Full LLM response (first 500 chars): {content[:500]}", file=sys.stderr)
-                print(f"[pj] DEBUG: System prompt length: {len(system_prompt)} chars", file=sys.stderr)
-                print(f"[pj] DEBUG: User prompt length: {len(user_prompt)} chars", file=sys.stderr)
             else:  # anthropic
                 message = client.messages.create(
                     model=model,
