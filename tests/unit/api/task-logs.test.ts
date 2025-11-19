@@ -9,15 +9,18 @@ process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
 let mockGetUser: ReturnType<typeof vi.fn>;
 let mockConvexQuery: ReturnType<typeof vi.fn>;
 
-// Mock @supabase/ssr
-const mockGetUserFn = vi.fn();
-vi.mock('@supabase/ssr', () => {
+// Mock Supabase
+vi.mock('@/lib/auth/supabase-server', () => {
+  const mockGetUserFn = vi.fn();
   return {
-    createServerClient: vi.fn(() => ({
+    createClient: vi.fn(() => ({
       auth: {
         getUser: mockGetUserFn,
       },
     })),
+    __mocks: {
+      getUser: mockGetUserFn,
+    },
   };
 });
 
@@ -38,8 +41,10 @@ describe('GET /api/task/[taskId]/logs', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     // Get the mock functions from the mocked modules
+    const { createClient } = await import('@/lib/auth/supabase-server');
     const { convexClient } = await import('@/lib/convex/server');
-    mockGetUser = mockGetUserFn;
+    const client = createClient() as any;
+    mockGetUser = client.auth.getUser;
     mockConvexQuery = convexClient.query;
     
     // Set up default mocks for authenticated user

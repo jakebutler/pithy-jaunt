@@ -9,9 +9,9 @@ export interface LayoutProps {
 
 export function Layout({ children, userEmail, showNavigation = true }: LayoutProps) {
   return (
-    <div className="min-h-screen bg-platinum-50">
+    <div className="min-h-screen bg-platinum-50" suppressHydrationWarning>
       {showNavigation && <Navigation userEmail={userEmail} />}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8" suppressHydrationWarning>
         <div className="px-4 py-6 sm:px-0">{children}</div>
       </main>
     </div>

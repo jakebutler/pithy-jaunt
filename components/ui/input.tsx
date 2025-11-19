@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, TextareaHTMLAttributes, forwardRef, ReactNode } from "react";
+import { InputHTMLAttributes, TextareaHTMLAttributes, forwardRef, ReactNode, useId } from "react";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -24,7 +24,8 @@ const errorStyles = "border-error focus:ring-error focus:border-error";
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, helpText, className = "", ...props }, ref) => {
-    const inputId = props.id || `input-${Math.random().toString(36).substr(2, 9)}`;
+    const generatedId = useId();
+    const inputId = props.id || `input-${generatedId}`;
     const hasError = !!error;
 
     return (
@@ -61,7 +62,8 @@ Input.displayName = "Input";
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ label, error, helpText, className = "", ...props }, ref) => {
-    const textareaId = props.id || `textarea-${Math.random().toString(36).substr(2, 9)}`;
+    const generatedId = useId();
+    const textareaId = props.id || `textarea-${generatedId}`;
     const hasError = !!error;
 
     return (
@@ -98,7 +100,8 @@ Textarea.displayName = "Textarea";
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ label, error, helpText, children, className = "", ...props }, ref) => {
-    const selectId = props.id || `select-${Math.random().toString(36).substr(2, 9)}`;
+    const generatedId = useId();
+    const selectId = props.id || `select-${generatedId}`;
     const hasError = !!error;
 
     return (

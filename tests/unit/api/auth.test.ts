@@ -2,6 +2,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { POST as signupPOST } from '@/app/api/auth/signup/route';
 import { POST as loginPOST } from '@/app/api/auth/login/route';
 
+// Set up environment variables for tests
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
+
 // Create mock functions that will be set up in beforeEach
 let mockSignUp: ReturnType<typeof vi.fn>;
 let mockSignInWithPassword: ReturnType<typeof vi.fn>;
