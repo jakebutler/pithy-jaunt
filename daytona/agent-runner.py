@@ -850,13 +850,16 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
                     extracted = matches[-1].strip()  # Use last match (most likely the actual content)
                     print(f"[pj] DEBUG: Extracted content from markdown code block (length: {len(extracted)} chars)", file=sys.stderr)
                     print(f"[pj] DEBUG: Extracted content preview: {extracted[:200]}", file=sys.stderr)
-                    # Only use extracted content if it looks like file content (starts with FILE: or is substantial)
-                    if extracted.startswith("FILE:") or len(extracted) > 500:
+                    # CRITICAL: Only use extracted content if it starts with "FILE:" - this is the required format
+                    # Do NOT extract shell commands, documentation snippets, or other non-file content
+                    if extracted.startswith("FILE:"):
                         content = extracted
-                        print(f"[pj] Using extracted content from code block", file=sys.stderr)
+                        print(f"[pj] Using extracted content from code block (starts with FILE:)", file=sys.stderr)
                     else:
-                        print(f"[pj] WARNING: Extracted content too short or doesn't start with FILE:, using original content", file=sys.stderr)
-                        # Don't extract - the code block might be wrong, use original content
+                        print(f"[pj] WARNING: Extracted content does not start with FILE:, ignoring code block extraction", file=sys.stderr)
+                        print(f"[pj] WARNING: This likely means the LLM returned wrong content (shell commands, docs, etc.)", file=sys.stderr)
+                        # Don't extract - the code block contains wrong content, use original content
+                        # The original content might have the correct FILE: format elsewhere
             
             for line in content.split('\n'):
                 # Stop parsing if we hit debug/error messages
