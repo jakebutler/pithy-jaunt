@@ -20,6 +20,10 @@
   },
   "dependencies": {
     "@daytonaio/sdk": "^0.115.0",
+    "@langchain/anthropic": "^1.1.0",
+    "@langchain/core": "^1.0.6",
+    "@langchain/langgraph": "^1.0.2",
+    "@langchain/openai": "^1.1.2",
     "@octokit/rest": "^22.0.1",
     "@sentry/node": "^10.25.0",
     "@sentry/react": "^10.25.0",
@@ -43,6 +47,7 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.20",
     "dotenv": "^17.2.3",
     "eslint": "^9.0.0",
@@ -51,6 +56,7 @@
     "playwright": "^1.56.1",
     "postcss": "^8",
     "tailwindcss": "next",
+    "tsx": "^4.20.6",
     "typescript": "^5",
     "vitest": "^4.0.9"
   },
