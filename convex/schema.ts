@@ -32,12 +32,19 @@ export default defineSchema({
     ),
     lastAnalyzedAt: v.optional(v.number()),
     coderabbitDetected: v.boolean(),
-    gitingestReportStatus: v.union(
+    // Legacy field - kept for backward compatibility with old documents
+    gitIngestStatus: v.optional(v.union(
       v.literal("pending"),
       v.literal("processing"),
       v.literal("completed"),
       v.literal("failed")
-    ),
+    )),
+    gitingestReportStatus: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    )),
     gitingestReport: v.optional(v.any()),
     gitingestReportGeneratedAt: v.optional(v.number()),
     gitingestReportError: v.optional(v.string()),
