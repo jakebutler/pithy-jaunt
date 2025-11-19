@@ -748,6 +748,11 @@ EOF
 
   # Temporarily disable exit on error to handle PR creation errors
   set +e
+  echo "[pj] Creating PR with payload:" >&2
+  echo "$PR_PAYLOAD" | jq . >&2 2>/dev/null || echo "$PR_PAYLOAD" >&2
+  echo "[pj] Repository: $REPO_OWNER/$REPO_NAME" >&2
+  echo "[pj] Branch: $BRANCH -> $BASE_BRANCH" >&2
+  
   PR_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
     "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/pulls" \
     -H "Authorization: token $GITHUB_TOKEN" \
@@ -756,6 +761,10 @@ EOF
     -d "$PR_PAYLOAD" 2>&1)
   PR_HTTP_CODE=$(echo "$PR_RESPONSE" | tail -1)
   PR_BODY_RESPONSE=$(echo "$PR_RESPONSE" | sed '$d')
+  
+  echo "[pj] PR creation HTTP code: $PR_HTTP_CODE" >&2
+  echo "[pj] PR creation response:" >&2
+  echo "$PR_BODY_RESPONSE" | jq . >&2 2>/dev/null || echo "$PR_BODY_RESPONSE" >&2
   set -e
 
   if [ "$PR_HTTP_CODE" = "201" ]; then
@@ -794,6 +803,17 @@ fi
 
 # Browser Use tests are now run as part of post-apply validation above
 # (This section is kept for backward compatibility but is now redundant)
+
+# Log PR URL before sending webhook
+echo "[pj] ========================================" >&2
+echo "[pj] Preparing to send completion webhook" >&2
+echo "[pj] PR_URL value: '${PR_URL:-<empty>}'" >&2
+echo "[pj] PR_URL length: ${#PR_URL}" >&2
+if [ -z "$PR_URL" ] || [ "$PR_URL" = "null" ]; then
+  echo "[pj] WARNING: PR_URL is empty or null!" >&2
+  echo "[pj] This may indicate PR creation failed silently" >&2
+fi
+echo "[pj] ========================================" >&2
 
 # Send success webhook
 send_webhook "task.completed" "success" "" "$PR_URL"
