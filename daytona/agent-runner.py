@@ -838,15 +838,25 @@ Output ONLY the file content(s), with no explanations, no markdown formatting ar
             current_content = []
             
             # Clean content - remove any markdown code blocks that might have been added
-            if "```" in content:
+            # BUT: Only extract if the content doesn't already start with "FILE:"
+            # The LLM should output FILE: format directly, not wrapped in code blocks
+            if "```" in content and not content.strip().startswith("FILE:"):
                 # Try to extract content from code blocks
                 import re
                 code_block_pattern = r"```(?:[a-z]+)?\n?(.*?)```"
                 matches = re.findall(code_block_pattern, content, re.DOTALL)
                 if matches:
                     # Use content from code blocks
-                    content = matches[-1].strip()  # Use last match (most likely the actual content)
-                    print(f"[pj] Extracted content from markdown code block", file=sys.stderr)
+                    extracted = matches[-1].strip()  # Use last match (most likely the actual content)
+                    print(f"[pj] DEBUG: Extracted content from markdown code block (length: {len(extracted)} chars)", file=sys.stderr)
+                    print(f"[pj] DEBUG: Extracted content preview: {extracted[:200]}", file=sys.stderr)
+                    # Only use extracted content if it looks like file content (starts with FILE: or is substantial)
+                    if extracted.startswith("FILE:") or len(extracted) > 500:
+                        content = extracted
+                        print(f"[pj] Using extracted content from code block", file=sys.stderr)
+                    else:
+                        print(f"[pj] WARNING: Extracted content too short or doesn't start with FILE:, using original content", file=sys.stderr)
+                        # Don't extract - the code block might be wrong, use original content
             
             for line in content.split('\n'):
                 # Stop parsing if we hit debug/error messages
