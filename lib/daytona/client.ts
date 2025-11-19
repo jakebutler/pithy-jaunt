@@ -114,12 +114,20 @@ export async function createWorkspace(params: CreateWorkspaceParams): Promise<{
     },
   };
 
+  // Log environment variable availability (without exposing values)
+  const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
+  const openRouterKeyLength = process.env.OPENROUTER_API_KEY?.length || 0;
+  const openRouterKeyPrefix = process.env.OPENROUTER_API_KEY?.substring(0, 10) || "none";
+  
   console.log("[Daytona] Creating workspace:", {
     url: `${DAYTONA_API_URL}/workspace`,
     hasApiKey: !!DAYTONA_API_KEY,
     apiKeyLength: DAYTONA_API_KEY?.length || 0,
     apiKeyPrefix: DAYTONA_API_KEY?.substring(0, 10) || "none",
     snapshotName: DAYTONA_SNAPSHOT_NAME,
+    hasOpenRouterKey,
+    openRouterKeyLength,
+    openRouterKeyPrefix,
     requestBody: JSON.stringify(requestBody, null, 2),
   });
 
